@@ -17,8 +17,27 @@ def cmd(args: list[str]) -> str:
         return f"UNAVAILABLE: {exc}"
 
 
+def windows_cpu_model() -> str | None:
+    query = "(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name).Trim()"
+    for shell in ("powershell.exe", "powershell", "pwsh"):
+        try:
+            value = subprocess.check_output(
+                [shell, "-NoProfile", "-Command", query],
+                text=True,
+                stderr=subprocess.STDOUT,
+            ).strip()
+        except Exception:
+            continue
+        if value:
+            return value
+    return None
+
+
 def cpu_model() -> str:
     if os.name == "nt":
+        value = windows_cpu_model()
+        if value:
+            return value
         value = os.environ.get("PROCESSOR_IDENTIFIER")
         if value:
             return value
