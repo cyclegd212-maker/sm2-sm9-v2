@@ -1,0 +1,3 @@
+# Reference dependency pinned for reproducibility.
+# This repository provides SM2, SM3 and a pure-Python SM9 implementation.
+git+https://github.com/gongxian-ding/gmssl-python.git@498ba0545a3f7667ab4575e93cd10e9b19baf4f0
