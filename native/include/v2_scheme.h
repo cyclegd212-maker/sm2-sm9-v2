@@ -13,6 +13,9 @@ extern "C" {
 #endif
 
 #define V2_SESSION_KEY_SIZE 32
+#define V2_OK 1
+#define V2_ERR (-1)
+#define V2_ERR_RETRY_TOKEN (-2)
 
 typedef struct {
     SM9_ENC_MASTER_KEY master;
@@ -41,6 +44,8 @@ typedef struct {
     uint8_t K_E[V2_SESSION_KEY_SIZE];
     uint8_t K_M[V2_SESSION_KEY_SIZE];
 } V2_KEM_MATERIAL;
+
+typedef SM2_SIGN_PRE_COMP V2_SM2_PRECOMP;
 
 int v2_setup(V2_KGC *kgc, V2_PUBLIC_PARAMS *pp);
 int v2_compute_qb(
@@ -84,7 +89,14 @@ int v2_kem_decapsulate(
     const V2_RECEIVER_KEY *receiver,
     const SM9_Z256_POINT *u,
     V2_KEM_MATERIAL *material);
+int v2_sm2_precompute(V2_SM2_PRECOMP *pre);
+int v2_sm2_sign_precomputed(
+    const V2_SENDER_KEY *sender,
+    const V2_SM2_PRECOMP *pre,
+    const uint8_t dgst[32],
+    SM2_SIGNATURE *sig);
 
+void v2_sm2_precomp_cleanup(V2_SM2_PRECOMP *pre);
 void v2_kem_material_cleanup(V2_KEM_MATERIAL *material);
 void v2_receiver_key_cleanup(V2_RECEIVER_KEY *receiver);
 void v2_sender_key_cleanup(V2_SENDER_KEY *sender);
