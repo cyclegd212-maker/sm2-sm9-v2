@@ -116,12 +116,50 @@ static int test_context_binding(void)
     return 1;
 }
 
+static int test_dual_factor_kem_agreement(void)
+{
+    V2_KGC kgc;
+    V2_PUBLIC_PARAMS pp;
+    V2_SENDER_KEY sender;
+    V2_RECEIVER_KEY receiver;
+    V2_KEM_MATERIAL encap;
+    V2_KEM_MATERIAL decap;
+    const uint8_t id_a[] = "Alice";
+    const char *id_b = "Bob";
+
+    CHECK(v2_setup(&kgc, &pp) == 1);
+    CHECK(v2_sender_keygen(&sender) == 1);
+    CHECK(v2_receiver_keygen(&kgc, &pp, id_b, strlen(id_b), &receiver) == 1);
+
+    CHECK(v2_kem_encapsulate(&pp, &sender,
+        id_a, sizeof(id_a) - 1,
+        id_b, strlen(id_b), &receiver.X_b, &encap) == 1);
+    CHECK(v2_kem_decapsulate(&pp, &sender,
+        id_a, sizeof(id_a) - 1,
+        id_b, strlen(id_b), &receiver, &encap.U, &decap) == 1);
+
+    CHECK(sm9_z256_fp12_equ(encap.Z1, decap.Z1) == 1);
+    CHECK(sm9_z256_point_equ(&encap.Z2, &decap.Z2) == 1);
+    CHECK(memcmp(encap.K_E, decap.K_E, sizeof(encap.K_E)) == 0);
+    CHECK(memcmp(encap.K_M, decap.K_M, sizeof(encap.K_M)) == 0);
+
+    v2_kem_material_cleanup(&decap);
+    v2_kem_material_cleanup(&encap);
+    v2_receiver_key_cleanup(&receiver);
+    v2_sender_key_cleanup(&sender);
+    v2_kgc_cleanup(&kgc);
+    return 1;
+}
+
 int main(void)
 {
     if (!test_setup_and_receiver_keygen()) {
         return 1;
     }
     if (!test_context_binding()) {
+        return 1;
+    }
+    if (!test_dual_factor_kem_agreement()) {
         return 1;
     }
     puts("test_v2: ok");
