@@ -15,7 +15,7 @@ def test_collect_env_records_gmssl_build_options(tmp_path: Path) -> None:
         "--run-id", "test-run",
         "--v2-commit", "v2-test",
         "--gmssl-commit", "gmssl-test",
-        "--gmssl-build-options", "-DENABLE_SM9=ON;-DENABLE_SM2_AMD64=OFF",
+        "--gmssl-build-options=-DENABLE_SM9=ON;-DENABLE_SM2_AMD64=OFF",
         "--build-type", "Release",
         "--warmup", "1000",
         "--iterations", "10000",
