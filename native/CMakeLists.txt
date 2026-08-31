@@ -56,6 +56,15 @@ v2_test_target(test_sm2_precomp tests/test_sm2_precomp.c)
 v2_test_target(test_signcryption tests/test_signcryption.c)
 v2_test_target(test_attacks tests/test_attacks.c)
 
+add_executable(bench_v2 bench/bench_v2.c)
+target_include_directories(bench_v2 PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(bench_v2 PRIVATE v2_scheme)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bench_v2 PRIVATE -Wall -Wextra -Werror)
+endif()
+
 add_test(
     NAME benchmark_smoke
     COMMAND bench_v2
