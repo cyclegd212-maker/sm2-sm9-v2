@@ -1,0 +1,86 @@
+name: windows-native-smoke
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GMSSL_COMMIT: 24ae482701a7b124826c382fffc55c19f76d475d
+
+jobs:
+  build-test-benchmark-smoke:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact V2 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Prepare evidence
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force artifacts | Out-Null
+
+      - name: Checkout pinned GmSSL
+        shell: pwsh
+        run: |
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL 2>&1 | Tee-Object -FilePath artifacts/gmssl-clone.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C _deps/GmSSL checkout $env:GMSSL_COMMIT 2>&1 | Tee-Object -FilePath artifacts/gmssl-checkout.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $Actual = (git -C _deps/GmSSL rev-parse HEAD).Trim()
+          if ($Actual -ne $env:GMSSL_COMMIT) { throw "GmSSL commit mismatch" }
+
+      - name: Configure build test and install GmSSL
+        shell: pwsh
+        run: |
+          $Prefix = Join-Path $PWD '_deps/gmssl-install'
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_SM9=ON "-DCMAKE_INSTALL_PREFIX=$Prefix" 2>&1 | Tee-Object -FilePath artifacts/gmssl-configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build _deps/GmSSL/build --parallel 2 2>&1 | Tee-Object -FilePath artifacts/gmssl-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir _deps/GmSSL/build -R '^(sm2_sign|sm3|sm3_hmac|sm9)$' --output-on-failure 2>&1 | Tee-Object -FilePath artifacts/upstream-tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --install _deps/GmSSL/build 2>&1 | Tee-Object -FilePath artifacts/gmssl-install.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Configure and build native V2
+        shell: pwsh
+        run: |
+          $Prefix = Join-Path $PWD '_deps/gmssl-install'
+          $env:PATH = "$(Join-Path $Prefix 'bin');$env:PATH"
+          cmake -S native -B native/build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DGMSSL_ROOT=$Prefix" 2>&1 | Tee-Object -FilePath artifacts/native-configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build native/build --parallel 2 2>&1 | Tee-Object -FilePath artifacts/native-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir native/build --output-on-failure 2>&1 | Tee-Object -FilePath artifacts/native-tests.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run real Windows benchmark smoke
+        shell: pwsh
+        env:
+          V2_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $Prefix = Join-Path $PWD '_deps/gmssl-install'
+          $env:PATH = "$(Join-Path $Prefix 'bin');$env:PATH"
+          $RunId = "gha-windows-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          python native/scripts/collect_env.py --output artifacts/environment.json --run-id $RunId --v2-commit $env:V2_SHA --gmssl-commit $env:GMSSL_COMMIT --build-type Release --warmup 2 --iterations 3 2>&1 | Tee-Object -FilePath artifacts/environment.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          native/build/bench_v2.exe --run-id $RunId --commit $env:V2_SHA --gmssl-commit $env:GMSSL_COMMIT --message-bytes 20 --warmup 2 --iterations 3 --raw artifacts/raw.csv 2>&1 | Tee-Object -FilePath artifacts/benchmark.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m native.bench.summarize artifacts/raw.csv artifacts/summary.csv 2>&1 | Tee-Object -FilePath artifacts/summary.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m native.bench.validate_evidence artifacts/raw.csv artifacts/summary.csv --sizes 20 --iterations 3 2>&1 | Tee-Object -FilePath artifacts/evidence-validation.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-smoke-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/
+          if-no-files-found: error
