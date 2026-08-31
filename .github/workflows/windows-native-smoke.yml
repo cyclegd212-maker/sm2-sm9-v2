@@ -70,7 +70,9 @@ jobs:
           $RunId = "gha-windows-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           python native/scripts/collect_env.py --output artifacts/environment.json --run-id $RunId --v2-commit $env:V2_SHA --gmssl-commit $env:GMSSL_COMMIT --build-type Release --warmup 2 --iterations 3 2>&1 | Tee-Object -FilePath artifacts/environment.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          native/build/bench_v2.exe --run-id $RunId --commit $env:V2_SHA --gmssl-commit $env:GMSSL_COMMIT --message-bytes 20 --warmup 2 --iterations 3 --raw artifacts/raw.csv 2>&1 | Tee-Object -FilePath artifacts/benchmark.log
+          $BenchExe = Join-Path $PWD 'native\build\bench_v2.exe'
+          if (!(Test-Path $BenchExe)) { throw "bench_v2.exe not found at $BenchExe" }
+          & $BenchExe --run-id $RunId --commit $env:V2_SHA --gmssl-commit $env:GMSSL_COMMIT --message-bytes 20 --warmup 2 --iterations 3 --raw artifacts/raw.csv 2>&1 | Tee-Object -FilePath artifacts/benchmark.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m native.bench.summarize artifacts/raw.csv artifacts/summary.csv 2>&1 | Tee-Object -FilePath artifacts/summary.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
