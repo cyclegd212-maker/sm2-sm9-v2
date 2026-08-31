@@ -22,6 +22,12 @@
 - `experiment_manifest.json` 中状态为 `NOT_MEASURED`
 - `data/raw/timings.csv` 与 `data/processed/summary.csv` 暂不含真实测试结果
 
+## 仓库状态
+
+规范仓库地址：`https://github.com/cyclegd212-maker/sm2-sm9-v2`。
+
+本仓库按“证据可追溯”原则维护：论文源文件、实验代码、依赖版本、原始 CSV、汇总 CSV 与运行日志应与具体 Git commit 对应。当前尚未执行正式性能测试，因此不得从本仓库推导或引用任何毫秒级性能结论。
+
 ## 后续实验要求
 
 在正式投稿前，建议补齐以下内容：
