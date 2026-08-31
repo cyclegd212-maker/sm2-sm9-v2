@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           $Prefix = Join-Path $PWD '_deps/gmssl-install'
-          cmake -S _deps/GmSSL -B _deps/GmSSL/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_SM9=ON "-DCMAKE_INSTALL_PREFIX=$Prefix" 2>&1 | Tee-Object -FilePath artifacts/gmssl-configure.log
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_SM9=ON -DENABLE_SM2_AMD64=OFF "-DCMAKE_INSTALL_PREFIX=$Prefix" 2>&1 | Tee-Object -FilePath artifacts/gmssl-configure.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build _deps/GmSSL/build --parallel 2 2>&1 | Tee-Object -FilePath artifacts/gmssl-build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
