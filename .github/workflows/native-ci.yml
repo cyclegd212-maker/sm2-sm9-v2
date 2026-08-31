@@ -1,0 +1,88 @@
+name: native-ci
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GMSSL_COMMIT: 24ae482701a7b124826c382fffc55c19f76d475d
+
+jobs:
+  native-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout V2
+        uses: actions/checkout@v4
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Checkout pinned GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL 2>&1 | tee artifacts/gmssl-clone.log
+          git -C _deps/GmSSL checkout "$GMSSL_COMMIT" 2>&1 | tee -a artifacts/gmssl-clone.log
+          test "$(git -C _deps/GmSSL rev-parse HEAD)" = "$GMSSL_COMMIT"
+
+      - name: Configure GmSSL Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/_deps/gmssl-install" \
+            -DENABLE_SM9=ON 2>&1 | tee artifacts/gmssl-configure.log
+
+      - name: Build GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build _deps/GmSSL/build --config Release -j2 2>&1 | tee artifacts/gmssl-build.log
+
+      - name: Run pinned upstream SM2 SM3 HMAC SM9 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir _deps/GmSSL/build \
+            -R '^(sm2_sign|sm3|sm3_hmac|sm9)$' \
+            --output-on-failure 2>&1 | tee artifacts/upstream-tests.log
+
+      - name: Install GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --install _deps/GmSSL/build 2>&1 | tee artifacts/gmssl-install.log
+
+      - name: Configure native V2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGMSSL_ROOT="$GITHUB_WORKSPACE/_deps/gmssl-install" 2>&1 | tee artifacts/native-configure.log
+
+      - name: Build native V2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build native/build --config Release -j2 2>&1 | tee artifacts/native-build.log
+
+      - name: Run native V2 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir native/build --output-on-failure 2>&1 | tee artifacts/native-tests.log
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-smoke-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: warn
