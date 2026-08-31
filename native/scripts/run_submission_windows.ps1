@@ -101,6 +101,9 @@ Invoke-Logged -Log (Join-Path $EvidenceDir "gmssl-install.log") -Command {
     cmake --install $GmSSLBuild --config Release
 }
 
+$GmSSLBin = Join-Path $GmSSLInstall "bin"
+$env:PATH = "$GmSSLBin;$env:PATH"
+
 $NativeConfigureArgs = @(
     "-S", (Join-Path $RepoRoot "native"),
     "-B", $NativeBuild,
