@@ -117,7 +117,7 @@ class ReceiverKey:
     X_b: Any
 
 
-@dataclass(frozen=True)
+@dataclass
 class OfflineToken:
     id_b: str
     X_b: Any
@@ -163,7 +163,6 @@ def validate_receiver_key(master_public: Any, receiver: ReceiverKey) -> None:
     Q_b = sm9.public_key_extract("encrypt", master_public, receiver.id_b)
     if not ec.eq(ec.multiply(Q_b, receiver.x_b), receiver.X_b):
         raise ValueError("X_B != [x_B]Q_B")
-    # Standard SM9 identity-key consistency: e(Q_B, d_B) = g.
     if ate.pairing(Q_b, receiver.d_b) != master_public[3]:
         raise ValueError("invalid SM9 identity private key")
 
@@ -190,7 +189,6 @@ def offline_signcrypt(master_public: Any, sender: SenderKey, receiver_id: str, X
 
 
 def _sm2_message_digest(obj: sm2.CryptSM2, mu: bytes) -> bytes:
-    # gmssl-python's SM2-with-SM3 Z_A processing, reused without calling sign().
     import binascii
     return binascii.a2b_hex(obj._sm3_z(mu).encode("utf-8"))
 
@@ -213,6 +211,9 @@ def sm2_sign_with_precomputation(sender: SenderKey, mu: bytes, k: int, x_R: int)
 def online_signcrypt(sender: SenderKey, token: OfflineToken, message: bytes) -> Ciphertext:
     if token.consumed:
         raise ValueError("offline token already consumed")
+    # Consume before any online operation. A retry or exception must not make the
+    # SM2 nonce/session keys reusable. Cross-process atomicity belongs to storage.
+    token.consumed = True
     ctx = encode_ctx(sender.id_a, sender.public_hex, token.id_b.encode(), token.X_b, token.U)
     stream = sm3_kdf(b"SM2-SM9-V2/ENC/v1" + _lp(token.K_E) + _lp(ctx), len(message))
     C = bytes(m ^ s for m, s in zip(message, stream))
@@ -227,7 +228,6 @@ def online_signcrypt(sender: SenderKey, token: OfflineToken, message: bytes) -> 
     sigma = sm2_sign_with_precomputation(sender, mu, token.k, token.x_R)
     mac_msg = b"SM2-SM9-V2/MAC/v1" + _lp(mu) + _lp(bytes.fromhex(sigma))
     tau = _hmac_sm3(token.K_M, mac_msg)
-    # Frozen dataclass cannot be mutated; the caller must enforce one-time storage semantics.
     return Ciphertext(token.X_b, token.U, C, sigma, tau)
 
 
