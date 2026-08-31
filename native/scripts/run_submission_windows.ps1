@@ -54,6 +54,7 @@ $GmSSLDir = Join-Path $DepsDir "GmSSL"
 $GmSSLBuild = Join-Path $GmSSLDir "build-v2-submission"
 $GmSSLInstall = Join-Path $DepsDir "gmssl-install-submission"
 $NativeBuild = Join-Path $RepoRoot "native\build"
+$GmSSLBuildOptions = "-DENABLE_SM9=ON;-DENABLE_SM2_AMD64=OFF"
 
 if (!(Test-Path $GmSSLDir)) {
     New-Item -ItemType Directory -Force -Path $DepsDir | Out-Null
@@ -84,6 +85,7 @@ $GmSSLConfigureArgs = @(
     "-G", $Generator,
     "-DCMAKE_BUILD_TYPE=Release",
     "-DENABLE_SM9=ON",
+    "-DENABLE_SM2_AMD64=OFF",
     "-DCMAKE_INSTALL_PREFIX=$GmSSLInstall"
 )
 Invoke-Logged -Log (Join-Path $EvidenceDir "gmssl-configure.log") -Command {
@@ -121,6 +123,7 @@ python native/scripts/collect_env.py `
     --run-id $RunId `
     --v2-commit $V2Commit `
     --gmssl-commit $GmSSLCommit `
+    "--gmssl-build-options=$GmSSLBuildOptions" `
     --build-type Release `
     --warmup $Warmup `
     --iterations $Iterations | Tee-Object -FilePath (Join-Path $EvidenceDir "environment.log")
@@ -155,6 +158,7 @@ $Hashes = @{
     run_id = $RunId
     v2_commit = $V2Commit
     gmssl_commit = $GmSSLCommit
+    gmssl_build_options = $GmSSLBuildOptions
     raw_sha256 = (Get-FileHash -Algorithm SHA256 $Raw).Hash.ToLowerInvariant()
     summary_sha256 = (Get-FileHash -Algorithm SHA256 $Summary).Hash.ToLowerInvariant()
 }
