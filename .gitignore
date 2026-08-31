@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+# Preserve experiment evidence directories but not accidental temp files
+logs/*.tmp
