@@ -1,0 +1,12 @@
+{
+  "status": "NOT_MEASURED",
+  "reason": "No real benchmark run has been executed in this artifact build environment.",
+  "reference_gmssl_repository": "https://github.com/gongxian-ding/gmssl-python",
+  "reference_gmssl_commit": "498ba0545a3f7667ab4575e93cd10e9b19baf4f0",
+  "required_outputs_after_real_run": [
+    "data/raw/timings.csv",
+    "data/processed/summary.csv",
+    "metadata/environment.json",
+    "logs/run.log"
+  ]
+}
