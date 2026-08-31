@@ -36,16 +36,22 @@ def main() -> None:
     p.add_argument("--run-id", required=True)
     p.add_argument("--v2-commit", required=True)
     p.add_argument("--gmssl-commit", required=True)
+    p.add_argument("--gmssl-build-options", default="")
     p.add_argument("--build-type", default="Release")
     p.add_argument("--warmup", type=int, required=True)
     p.add_argument("--iterations", type=int, required=True)
     args = p.parse_args()
+
+    gmssl_build_options = [
+        option for option in args.gmssl_build_options.split(";") if option
+    ]
 
     meta = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "run_id": args.run_id,
         "v2_commit": args.v2_commit,
         "gmssl_commit": args.gmssl_commit,
+        "gmssl_build_options": gmssl_build_options,
         "build_type": args.build_type,
         "warmup": args.warmup,
         "iterations": args.iterations,
