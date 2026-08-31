@@ -26,7 +26,9 @@ if(NOT GMSSL_INCLUDE_DIR OR NOT GMSSL_LIBRARY)
     message(FATAL_ERROR "Unable to locate GmSSL headers/library below GMSSL_ROOT=${GMSSL_ROOT}")
 endif()
 
-add_library(v2_scheme STATIC src/v2_scheme.c)
+add_library(v2_scheme STATIC
+    src/v2_scheme.c
+    src/v2_sm2.c)
 target_include_directories(v2_scheme PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${GMSSL_INCLUDE_DIR}")
