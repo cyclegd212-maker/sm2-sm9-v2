@@ -5,14 +5,14 @@ Current manuscript deliverables are generated separately from the code repositor
 ## Latest PDF
 
 - Filename: `SM2_SM9_V2_投稿标准化研究稿_GapBCAA证明与Windows稳定版.pdf`
-- SHA-256: `63a772920b5c1948fa036e2497f776d2afbb4cca7245a1bb27c989fd856e98ba`
+- SHA-256: `79a10b9b78319fd4adb980d04daa028a17f70d8ae593d72f63f171377fe6810e`
 - Pages: 24
-- Status: compiled successfully with XeLaTeX and rendered page-by-page for layout inspection. The security section now contains the concrete Type-I-KSR → SM9-KEM → Gap-q-BCAA1_{1,2} bridge and the corrected Type-II plain-CDH/query-extraction distinction. CI timings remain reproducibility evidence rather than the final Ryzen submission benchmark.
+- Status: compiled successfully with XeLaTeX and rendered page-by-page for layout inspection. The security section contains the concrete Type-I-KSR → SM9-KEM → Gap-q-BCAA1_{1,2} bridge, the corrected Type-II plain-CDH/query-extraction distinction, and an explicit citation to the Bentahar–Farshim–Malone-Lee–Smart ID-KEM/DEM hybrid theorem. CI timings remain reproducibility evidence rather than the final Ryzen submission benchmark.
 
 ## Latest LaTeX source
 
 - Source filename: `SM2_SM9_V2_投稿标准化研究稿_GapBCAA证明与Windows稳定版.tex`
-- SHA-256: `4bc0a9335732485cef6ca7a698d8d06f011a5329c2b33cd30310a1413d5117cc`
+- SHA-256: `c827db1395b68ffa83043c7a9b9de20a9273ac89733771dcc50772018742d99a`
 - Status: source used to generate the PDF above. Generated manuscript files are delivered separately; this status file records their integrity identity.
 
 ## Implementation evidence
@@ -20,8 +20,7 @@ Current manuscript deliverables are generated separately from the code repositor
 - Native library: GmSSL 3.x pinned at `24ae482701a7b124826c382fffc55c19f76d475d`.
 - Native V2 implements dual-factor KEM, single-token SM2 offline precomputation, one-time token lifecycle, canonical ciphertext encoding, online signcryption and unsigncryption.
 - Correctness/adversarial coverage includes round trips, field tampering, wrong keys, invalid/infinity points, token reuse, and Type-I-KSR/Type-II knowledge-path demonstrations.
-- Current verified branch head: `88ba1854b3dd2701daa3437d546c653bb1a85abc`.
-- On that head the Linux native CI, Windows native smoke, benchmark metadata contract, and Windows submission-script check all complete successfully.
+- The verified implementation head before this status-only update is `88ba1854b3dd2701daa3437d546c653bb1a85abc`; Linux native CI, Windows native smoke, benchmark metadata contract, and Windows submission-script check all completed successfully on that head.
 
 ## Windows toolchain status
 
@@ -43,13 +42,14 @@ Current manuscript deliverables are generated separately from the code repositor
 ### Type-I-KSR confidentiality
 
 - Model: Known-Secret Public-Key Replacement (Type-I-KSR), explicitly weaker than the strongest classical CL-PKC arbitrary public-key replacement model.
-- Exact identity-factor mapping is now checked:
+- Exact identity-factor mapping is checked:
   `Q_B=[h_B+s]P1`, `d_B=[s/(h_B+s)]P2`, `U=[rho]Q_B`, hence
   `Z1=e(U,d_B)=e(P1,P2)^(rho s)=g^rho`.
 - This is exactly the hidden pairing value of Cheng's SM9-KEM security analysis (Theorem 4, INSCRYPT 2018, DOI `10.1007/978-3-030-14234-6_1`).
 - Under Type-I-KSR the active user-factor secret `x_B` is known to the adversary/simulator, so `Z2=[x_B]U` is computable and enters the session KDF as auxiliary known input.
 - Concrete base assumption for the Cheng path: `Gap-q-BCAA1_{1,2}` in the random-oracle model, not ordinary `q-BDHI`.
 - The Gap reduction can test candidate hidden pairing values with the DBIDH oracle; therefore challenge-identity KDF-query count enters reduction running time rather than adding an unsupported `1/q_K` advantage loss.
+- The full confidentiality bound now cites the generic ID-KEM/one-time-DEM hybrid theorem of Bentahar et al., Journal of Cryptology 21(2):178–199, DOI `10.1007/s00145-007-9000-z`, instead of leaving the hybrid coefficient unattributed.
 - Reviewer-grade proof skeleton: `docs/security/TYPE_I_KSR_REDUCTION.md`.
 
 ### Type-II confidentiality
@@ -60,7 +60,7 @@ Current manuscript deliverables are generated separately from the code repositor
 
 ### Authentication
 
-- Confidentiality and authenticity are now separated to avoid double-counting assumptions.
+- Confidentiality and authenticity are separated to avoid double-counting assumptions.
 - Type-I confidentiality is expressed through the SM9-derived KEM plus authenticated one-time DEM; SM2 EUF-CMA is reserved for the separate authentication/unforgeability theorem.
 - Multi-session authenticity still requires an explicit multi-key HMAC PRF/UFCMA treatment or a target-session guessing reduction.
 
