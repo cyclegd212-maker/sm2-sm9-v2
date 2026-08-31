@@ -28,7 +28,8 @@ endif()
 
 add_library(v2_scheme STATIC
     src/v2_scheme.c
-    src/v2_sm2.c)
+    src/v2_sm2.c
+    src/v2_signcryption.c)
 target_include_directories(v2_scheme PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${GMSSL_INCLUDE_DIR}")
