@@ -26,10 +26,17 @@ if(NOT GMSSL_INCLUDE_DIR OR NOT GMSSL_LIBRARY)
     message(FATAL_ERROR "Unable to locate GmSSL headers/library below GMSSL_ROOT=${GMSSL_ROOT}")
 endif()
 
-add_executable(test_compile tests/test_compile.c)
-target_include_directories(test_compile PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${GMSSL_INCLUDE_DIR}")
-target_link_libraries(test_compile PRIVATE "${GMSSL_LIBRARY}")
+function(v2_test_target name source)
+    add_executable(${name} ${source})
+    target_include_directories(${name} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${GMSSL_INCLUDE_DIR}")
+    target_link_libraries(${name} PRIVATE "${GMSSL_LIBRARY}")
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${name} PRIVATE -Wall -Wextra -Werror)
+    endif()
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
 
-add_test(NAME native_compile COMMAND test_compile)
+v2_test_target(test_compile tests/test_compile.c)
+v2_test_target(test_v2 tests/test_v2.c)
