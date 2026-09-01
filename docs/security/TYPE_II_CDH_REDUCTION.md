@@ -1,187 +1,244 @@
-# Type-II 恶意 KGC 的 CDH 缩放嵌入与 Oracle 模拟
+# Type-II 恶意 KGC：最终 plain-CDH 归约与 Oracle 模拟
 
-本文档记录 V2 的 Type-II 机密性证明应如何写，重点避免早期“特殊编程 `H1(ID*)`”可被已知主密钥的恶意 KGC 识别的问题，并严格区分 Type-II 的 plain-CDH query extraction 与 Type-I-KSR 的 Cheng Gap-BCAA reduction。
+本文档给出 V2 在 Type-II 恶意 KGC 模型下的 reviewer-grade IND-CCA 归约。目标是把早期“结构模板”收敛为可直接进入论文的概率系数、Oracle 行为和运行时间说明，同时避免把 Type-I 的 Gap-BCAA/DBIDH 能力错误复制到 Type-II。
 
-## 1. Type-II 能力
+## 1. 模型与查询计数
 
-Type-II 攻击者获得 SM9 主私钥 `s`，因此能够计算任意身份私钥 `d_ID` 和身份因子 `Z_1`。但是：
+Type-II 攻击者得到 SM9 主秘密 `s`，因而能计算任意身份私钥 `d_ID` 和身份因子 `Z1`；但对挑战接收者：
 
-- 不允许替换挑战用户的 `X_B`；
-- 不知道挑战用户自行选择的 `x_B`；
-- 目标是从 `Q_B, U=[rho]Q_B, X_B=[x_B]Q_B` 得到 `Z_2=[rho x_B]Q_B`。
+- 不得替换 `X_B*`；
+- 不得获得用户秘密 `x_B*`；
+- 挑战发送者的 SM2 私钥不泄漏。
 
-因此 V2 将 Type-II 缺失因子与 `G1` 上 CDH 对齐。
+记：
 
-## 2. 为什么不能强制 `Q_B^*=P`
+- `N_U`：游戏中被懒惰实例化用户公开因子 `X_ID=[x_ID]Q_ID` 的不同接收身份数。Type-II 无 ReplacePK，因此在当前接口下可取 `N_U <= q_x + q_sc + q_usc + 1`；如果最终游戏另有显式 PublicKey/CreateUser 查询，则把其计数加入该上界。
+- `q_K* <= q_K`：满足 `(Z1,ctx)=(Z1*,ctx*)` 的 challenge-candidate session-KDF 查询上限；最终定理可用全局 `q_K` 保守替代。
+- `q_sc* <= q_sc`：针对挑战接收状态的 Signcrypt 查询数。
+- `q_usc* <= q_usc`：针对挑战接收状态的 Unsigncrypt 查询数。
+- `q_E* <= q_E`：与挑战 `ctx*`/消息长度相关的 stream-KDF 查询数。
+- `kappa=256`：`K_E,K_M` 与 HMAC tag 的比特长度。
 
-早期想法若令 `H1(ID_B^*)=1-s`，则 `Q_B^*=(H1(ID_B^*)+s)P=P`。但 Type-II 已知 `s`，所以它看到挑战身份的 `H1` 输出时能够识别该特殊关系，模拟分布不再与真实随机预言机一致。
+## 2. 随机预言机与状态表
 
-因此该嵌入必须弃用。
+模拟器维护：
 
-## 3. 缩放 CDH 嵌入
+- `L_1[ID] = h`：`H1` 表；
+- `L_U[ID] = (h,Q,d,x_or_perp,X,state)`：接收用户表；
+- `L_K[(Z1,Z2,ctx)] = (K_E,K_M)`：session-KDF 表；
+- `L_E[(K_E,ctx,len)] = S`：stream-KDF 表；
+- `L_SC[mu] = (X,U,C,sigma,tau,M,K_E,K_M)`：Signcrypt 输出记录；
+- `CH = (mu*,X*,U*,C*,sigma*,tau*,K_E*,K_M*)`：挑战记录。
 
-给归约算法 CDH 实例：
+规范编码必须保证 `mu=Enc(SC,ctx,C)` 对 `(ID_A,P_A,ID_B,X,U,C)` 单射。
 
-`(P, A=[a]P, B=[b]P)`，目标计算 `[ab]P`。
+## 3. 用户公开因子的 lazy embedding
 
-归约算法：
+给 CDH 实例 `(P,A=[a]P,B=[b]P)`，目标输出 `[ab]P`。模拟器预选
 
-1. 正常选择 SM9 主私钥 `s` 并交给 Type-II 攻击者；
-2. 猜测将承载 CDH public-key embedding 的挑战用户/身份；
-3. 对该身份诚实均匀采样 `h* in Z_q`；
-4. 令 `c=h*+s mod q`。若 `c=0` 则中止，该事件概率为 `1/q`；
-5. 设置
-   - `Q_B^*=cP`
-   - `U^*=cA=c[a]P`
-   - `X_B^*=cB=c[b]P`。
+`i* <- {1,...,N_U}`。
 
-因为 `h*` 与真实随机预言机输出同分布，而且 Type-II 已知 `s` 后计算的 `Q_B^*=(h*+s)P` 正好等于 `cP`，因此挑战身份在 `H1` 层没有可识别的特殊编程。
+每当一个新的接收身份第一次需要创建用户公开因子时，计数器加一：
 
-真实挑战随机数在该嵌入中等价于 `rho=a`，挑战所缺用户因子为
+- 若不是第 `i*` 个，正常采样 `x` 并置 `X=[x]Q`；
+- 若是第 `i*` 个，则诚实采样 `h* <- Z_q`，令 `c=h*+s mod q`。若 `c=0` 中止；否则
+  - `Q*=cP`,
+  - `X*=cB=[b]Q*`,
+  - `x*=perp`（模拟器未知）。
 
-`Z_2^*=[rho]X_B^*=c[ab]P`。
+若嵌入身份最终不是挑战身份，归约失败；若嵌入身份在挑战前被 RevealUserSecret，则归约中止。条件在 `i*` 正好命中最终挑战身份时，挑战新鲜性保证后一中止不会发生。
 
-如果归约算法从正确 session-KDF 查询中获得 `Z_2^*`，则输出
+因为 `h*` 仍然均匀，且 Type-II 已知 `s` 后计算出的 `Q*=(h*+s)P` 与真实分布一致，所以没有可检测的 H1 编程。
 
-`[c^{-1}]Z_2^*=[ab]P`。
+## 4. 挑战 CDH 缩放嵌入
 
-## 4. 随机预言机与状态表
+在挑战身份命中时，令
 
-投稿版至少维护：
+- `U*=cA=[a]Q*`,
+- `d_B*=[s/c]P2`,
+- `Z1*=e(U*,d_B*)=e(P,P2)^(as)`。
 
-- `L_1`: `H1(ID)` 查询表；
-- `L_K`: 会话密钥 KDF 查询表；
-- `L_E`: 加密流 SM3-KDF 查询表；
-- `L_SC`: signcryption oracle 输出记录；
-- `L_PK`: 用户公开因子、challenge-embedding 标记和不可替换状态；
-- `L_MAC`: 若不黑盒引用 multi-key HMAC 定理，则记录相关 MAC/PRF 查询。
+未知用户因子是
 
-所有随机预言机重复输入必须返回一致结果。
+`Z2*=[b]U*=c[ab]P`。
 
-## 5. 为什么 plain CDH 下存在关键 KDF-query extraction 问题
+若得到 `Z2*`，输出
 
-Type-II simulator 知道 `s`，所以能算
+`[c^{-1}]Z2*=[ab]P`。
 
-`Z_1^*=g^rho=e(U^*,d_B^*)`，
+## 5. Signcrypt Oracle
 
-但不知道
+### 非挑战身份
 
-`Z_2^*=c[ab]P`。
+已知 `(d,x)`，真实运行 V2。
 
-挑战时因此不能真实调用
+### 挑战身份
 
-`H_K(Z_1^*,Z_2^*,ctx^*)`。
+模拟器对每次 Signcrypt 查询自行采样 `rho`，因此即使未知 `x_B*=b`，也能计算
 
-若归约目标是 **plain CDH**，simulator 没有 DDH/gap oracle 去测试任意候选 `Z_2` 是否等于真实 `Z_2^*`。一个保守且可审计的处理是：
+`U=[rho]Q*`, `Z2=[rho]X*`。
 
-1. 挑战时随机选择 `K_E^*,K_M^*`；
-2. 用其生成 challenge ciphertext；
-3. 预先猜测第 `j^*` 个相关 `H_K` 查询是第一次包含真实 `(Z_1^*,Z_2^*,ctx^*)` 的查询；
-4. 在该索引提取候选 `Z_2`；
-5. 若该 query 确为攻击者区分 challenge 所必需的正确 query，则输出 `[c^{-1}]Z_2` 解 CDH；否则归约失败。
+`Z1=g^rho` 也可正常计算。因此 `H_K`、`H_E`、SM2 与 HMAC 全部真实执行，并把完整结果写入 `L_SC`。
 
-这里的“猜 query”不是漂亮但多余的写法，而是 plain-CDH simulator 缺少候选检测能力的直接后果。
+### Challenge-U collision
 
-如果未来改用 Gap-CDH/DDH-assisted 假设，从而能够测试候选 `Z_2`，则可重新设计 reduction 并去掉 `1/q_K` 损失；但那是**不同安全假设**，不能把 Type-I 的 Gap-BCAA 技巧无条件搬来。
+定义 `Coll_U`：某个针对挑战接收状态的 Signcrypt 查询偶然产生 `U=U*`。由于每个 `rho` 在 `Z_q^*` 上均匀，
 
-## 6. 挑战身份与关键查询损失
+`Pr[Coll_U] <= q_sc*/(q-1)`。
 
-设：
+必须显式剔除该事件：否则现实游戏中该查询与挑战共享同一 KEM 输入/会话密钥，而模拟器在挑战时又独立抽样 `(K_E*,K_M*)`，会造成可利用的 OTP/key-reuse 差异。
 
-- `N_ID`：可能承载 challenge user-key embedding 的候选数量上界；
-- `q_K`：相关 session-KDF 查询上界；
-- `E_id`：challenge embedding 猜测正确；
-- `E_c`：`c != 0`；
-- `E_K`：关键 KDF 查询索引猜测正确。
+## 6. Unsigncrypt Oracle：完整三分支模拟
 
-保守地有
+对挑战身份收到 `CT=(X,U,C,sigma,tau)` 后，先做公开点验证、当前 `X*` 检查、构造 `mu` 并验证 SM2。
 
-`Pr[E_id] >= 1/N_ID`，
+### Case A：`mu` 既不在 `L_SC`，也不是 `mu*`
 
-`Pr[E_c] = 1-1/q`，
+若 SM2 验证失败，返回 `perp`。若验证成功，触发 `Bad_sig`：这是对从未由目标 sender 的 Signcrypt/挑战签名过程签过的新 `mu` 的有效 SM2 签名。修改游戏立即拒绝，游戏差异至多
 
-`Pr[E_K] >= 1/q_K`。
+`Adv_SM2^EUF-CMA(B_sig)`。
 
-因此 plain-CDH reduction 预期承受 `N_ID*q_K` 量级的 advantage loss，并额外支付 `c=0` 中止与 oracle bad events。最终常数必须在完整 game 序列冻结后由事件概率逐项推出。
+SM2 reduction 需模拟至多 `q_sc+1` 次目标 sender 签名（`+1` 为挑战签名）。
 
-## 7. Challenge-identity UnSC oracle 模拟
+### Case B：`mu in L_SC`
 
-针对 challenge user，归约不知道 `x_B^*`，所以无法对任意新 ciphertext 直接计算 `Z_2=[x_B^*]U`。在坚持 plain-CDH 的 proof path 下，可利用 signcryption 认证层把接受的查询分解。
+模拟器已经保存该记录的 `M,K_M,sigma_0,tau_0`，因此无需 `x_B*`：
 
-### 7.1 Signcryption-oracle 已记录的 ciphertext
+- 若 `sigma=sigma_0`，直接用存储 `K_M` 重新验证 HMAC；有效时返回记录明文 `M`；
+- 若 `sigma != sigma_0`，仍用存储 `K_M` 真实验证新的 MAC 输入 `Enc(MAC,mu,sigma)`；有效时返回同一记录明文 `M`，否则 `perp`。
 
-对 `L_SC` 中由 simulator 自己生成的完整记录，直接查表回答；不需要重算 challenge user 的 `Z_2`。
+因此 **普通 Signcrypt 记录上的替代 SM2 签名不需要作为 confidentiality proof 的 HMAC bad event**。模拟器知道这些记录的会话 MAC key，可以精确回答。
 
-### 7.2 新 canonical transcript `mu` 却通过 SM2 验签
+### Case C：`mu=mu*`
 
-若 `mu` 从未由 signcryption oracle 签过，却通过 SM2 verification，则这是 sender-authentication proof 中的 `Bad_sig`，可归入 SM2 EUF-CMA。
+- 若 `(sigma,tau)=(sigma*,tau*)`，则是逐字节挑战密文，IND-CCA 规则拒绝；
+- 若 `sigma=sigma*` 但 `tau != tau*`，真实 HMAC 确定性意味着拒绝；
+- 若 `sigma != sigma*`，先公开验证 SM2。若无效则拒绝；若有效，则攻击者必须为新的 MAC 输入 `(mu*,sigma)` 产生挑战会话 key 下的有效 tag。
 
-### 7.3 已签过 `mu`，但换成另一个随机化 SM2 signature
+为了不暗含 SM2 strong unforgeability，Type-II confidentiality 对**挑战会话 HMAC**采用单目标 PRF hybrid：把 `HMAC_{K_M*}` 替换为随机函数 `F*`。游戏差异至多
 
-ordinary EUF-CMA 不覆盖同消息的不同合法随机化签名。由于 V2 的
+`Adv_HMAC^PRF(B_prf)`。
 
-`tau=HMAC_{K_M}(mu||sigma)`
+在随机函数游戏里，除已给出的输入 `(mu*,sigma*)` 外，每个新的 `(mu*,sigma)` 的正确 tag 都是独立均匀 `kappa` 比特，因此所有 challenge-mu 替代签名 UnSC 尝试的成功概率至多
 
-绑定具体 `sigma`，要让 `(mu,sigma')` 成为新的可接受 ciphertext 还需要突破 session MAC binding；该事件归入 HMAC PRF/UFCMA 项。
+`q_usc*/2^kappa`。
 
-### 7.4 Challenge equivalence
+这比旧版“对所有 L_SC 会话支付 multi-key HMAC UF-CMA”更紧，也避免与后面的独立 authenticity theorem 重复计项。
 
-challenge ciphertext 本身及游戏定义的等价查询必须拒绝。等价关系必须基于 canonical encoding，而不是仅比较指针或某一个字段。
+## 7. Challenge 与 Ask* 事件
 
-该路径使 simulator 在 `Bad_sig/Bad_mac` 未发生时，不必对任意新 challenge-user ciphertext 真实 decapsulate。
+挑战时模拟器独立均匀采样 `(K_E*,K_M*)`，通过自己的 `H_E` 表产生掩码，诚实生成 SM2 challenge signature 和 HMAC/PRF-hybrid tag。
 
-## 8. HMAC 与 SM2 项应该出现在哪里
+定义
 
-与 Type-I-KSR 不同，当前 Type-II **plain-CDH** oracle simulation 利用了认证层来限制无法 decapsulate 的新查询，因此 confidentiality proof 本身可能支付 `Bad_sig/Bad_mac` 项。
+`Ask* := A queries H_K(Z1*, Z2*, ctx*)`。
 
-若论文采用这种 proof path：
+若 `not Ask*`，且下列事件均未发生：
 
-- 新 `mu` 的有效签名：SM2 EUF-CMA；
-- 同 `mu` 新随机化签名或修改 transcript 后仍通过 tag：HMAC binding；
-- 多个 signcryption session 具有独立 `K_M`，因此应使用 multi-key HMAC security，或猜目标会话后支付相应损失。
+- `Bad_sig`；
+- `Coll_U`；
+- challenge-HMAC PRF hybrid 区分；
+- challenge alternative-tag random-function guess；
+- `Guess_E`：攻击者以某个候选 `K_E` 命中 `(K_E*,ctx*,len*)` 的 `H_E` 查询；
 
-不能在 Type-I-KSR 中因为 Type-II 需要这些项，就机械地把相同 bad-event decomposition 重复放入 Type-I confidentiality 主界。两种 simulator 的能力不同。
+则挑战 `K_E*,K_M*` 对攻击者保持独立随机，`C*` 是一次性随机掩码；因 `C*` 的分布与 `b` 无关，所以由其确定的 `mu*`、SM2 signature 与 random-function tag 的联合分布也与 `b` 无关。因此条件成功概率恰为 `1/2`。
 
-## 9. Cheng SM9-KEM 定理与本 Type-II proof 的关系
+其中
 
-Cheng, *Security Analysis of SM9 Key Agreement and Encryption*, Theorem 4（INSCRYPT 2018, DOI `10.1007/978-3-030-14234-6_1`）已经逐项核对：
+`Pr[Guess_E] <= q_E*/2^kappa`。
 
-- SM9-KEM 的隐藏 pairing value
-  `t=e(C1,d_ID)`
-  与 V2 的
-  `Z_1=e(U,d_B)=g^rho`
-  完全一致；
-- Theorem 4 在 `H2RF1,KDF2` 作为随机预言机时，把 SM9-KEM ID-IND-CCA2 归约到 `Gap-q-BCAA1_{1,2}`；
-- 其 Gap solver 具有 DBIDH oracle，因此挑战身份的 KDF-query 数 `q_K` 进入运行时间 `O(q_K*q_D*O_DBIDH)`，而不是 `1/q_K` advantage denominator。
+令
 
-这直接解决的是 **Type-I-KSR 的缺失身份因子 `Z_1`**，详见 `TYPE_I_KSR_REDUCTION.md`。
+`delta_II = Adv_SM2^EUF-CMA(B_sig)
+          + Adv_HMAC^PRF(B_prf)
+          + q_usc*/2^kappa
+          + q_E*/2^kappa
+          + q_sc*/(q-1)`。
 
-它**不能**自动解决当前 Type-II 的缺失用户因子 `Z_2`：Type-II 已知 KGC 主秘密，SM9 identity factor 对攻击者并不隐藏；真正未知的是 `G1` 上的 user-secret CDH 项。因此 Type-II 仍需独立的 CDH reduction。
+若本文 IND 优势采用半优势
 
-## 10. 当前 Type-II 定理措辞
+`epsilon_II = |Pr[b'=b]-1/2|`，
 
-在当前 plain-CDH proof path 下，可接受的保守措辞是：
+则
 
-> In the random-oracle model, assuming CDH is hard in `G1`, SM2 satisfies the stated EUF-CMA property, and the session MAC satisfies the required multi-key PRF/UFCMA property, V2 satisfies IND-CCA confidentiality against the specified Type-II malicious-KGC adversary. The reduction uses a distribution-preserving scaled CDH embedding and incurs losses for challenge-user embedding, the negligible event `h*+s=0`, critical session-KDF query extraction, and authentication-layer bad events required to simulate challenge-user unsigncryption queries.
+`Pr[Ask*] >= 2 [epsilon_II-delta_II]_+`。
 
-最终主界应具有如下结构，而不是提前冻结成未经核算的等式：
+这里不再把 `Bad_k`、全局 `H_K` 输出碰撞或 multi-key HMAC UF 项机械塞进 Type-II confidentiality：
 
-`Adv_TypeII(A)`
-`<= N_ID*q_K/(1-1/q) * Adv_CDH(B)`
-` + Bad_sig`
-` + Bad_mac`
-` + RO/encoding negligible terms`，
+- SM2 nonce 的随机性已由底层 SM2 EUF-CMA 实例吸收；
+- 随机预言机允许自然输出碰撞，不需要模拟器强制唯一，因此无需人为定义全局 `Bad_H`；
+- 非挑战 Signcrypt 记录的 `K_M` 已被模拟器保存，可以精确验证；只有 challenge HMAC 需要 PRF/随机函数混合。
 
-其中具体系数应从最终游戏逐项推导。注意该行只是**结构模板**；在没有完成事件条件概率整理之前，不应作为论文正式定理公式。
+## 8. q_K query-index extraction
 
-## 11. Reviewer checklist
+plain-CDH 模拟器没有 DDH/gap oracle，无法测试任意候选 `Z2`。因此预选
 
-- [x] 放弃可识别的 `H1(ID*)=1-s` 特殊编程；
-- [x] 使用诚实 `h*` 与 `c=h*+s` 缩放 embedding；
-- [x] 显式计入 `Pr[c=0]=1/q`；
-- [x] 区分 Type-I Gap-BCAA 的 DBIDH 检测能力与 Type-II plain-CDH；
-- [x] 不把 Type-I 的“q_K 只进入运行时间”错误搬到 Type-II；
-- [ ] 冻结 Type-II challenge-user/public-key creation game，确定 `N_ID` 的准确含义；
-- [ ] 逐条列出 Signcrypt/Unsigncrypt/Hash oracle 并证明模拟一致；
-- [ ] 从事件概率推出最终常数，而不是使用本文件的结构模板代替证明；
-- [ ] 与独立 authenticity theorem 的 SM2/HMAC 项去重。
+`j* <- {1,...,q_K}`。
+
+只对满足 `(Z1,ctx)=(Z1*,ctx*)` 的 candidate `H_K` 查询计数。前 `j*-1` 个 candidate 返回独立随机输出；第 `j*` 个 candidate `(Z1*,Z2hat,ctx*)` 到来时，立即输出
+
+`[c^{-1}]Z2hat`
+
+并终止。
+
+若 `j*` 正好等于第一次正确 `Ask*` 的 candidate index，则在终止前所有错误候选的 RO 输出与真实分布一致，且输出为 `[ab]P`。正确 query 存在时，猜中概率至少 `1/q_K`。
+
+## 9. 最终 Type-II 定理与系数
+
+设 `B_CDH` 为上述求解器，`B_sig` 为 SM2 EUF-CMA 归约器，`B_prf` 为单目标 HMAC PRF 区分器。则
+
+`Adv_CDH_G1(B_CDH)
+ >= (1-1/q) * 2 [epsilon_II-delta_II]_+ / (N_U q_K)`。
+
+等价地，论文最方便采用的上界是
+
+`epsilon_II
+ <= delta_II
+  + (N_U q_K)/(2(1-1/q)) * Adv_CDH_G1(B_CDH)`。
+
+用全局查询上限写成：
+
+`epsilon_II
+ <= Adv_SM2^EUF-CMA(B_sig)
+  + Adv_HMAC^PRF(B_prf)
+  + q_usc/2^kappa
+  + q_E/2^kappa
+  + q_sc/(q-1)
+  + (N_U q_K)/(2(1-1/q)) Adv_CDH_G1(B_CDH)`。
+
+若改用 normalized advantage `|2Pr[win]-1|`，上述主式中的 `1/2` 系数相应消失。
+
+## 10. 运行时间
+
+CDH solver 本身（不含独立的 SM2/HMAC reduction）满足结构性上界
+
+`t_BCDH <= t_A
+ + O(N_U*T_1m
+     + q_sc*(2*T_1m + T_Te + T_SM2 + T_H)
+     + q_usc*(T_SM2V + T_H + T_lookup)
+     + q_K*T_parse
+     + q_E*T_H
+     + T_1m)`。
+
+最后一个 `T_1m` 是成功提取后乘 `c^{-1}`。与旧稿不同，不应为每个 `H_K` candidate 都计一次 G1 标量乘；candidate 阶段只需解析、比较 `(Z1,ctx)` 与表访问。
+
+`B_sig` 的运行时间约为 `t_A` 加 `q_sc+1` 次签名 oracle 转发与 `q_usc` 次公开验签；`B_prf` 只嵌入 challenge HMAC key，oracle 查询数至多 `1+q_alt`，其中 `q_alt<=q_usc*`。
+
+## 11. 与独立 authenticity theorem 的去重规则
+
+- Type-II confidentiality 只支付 `SM2 EUF-CMA + challenge-key HMAC PRF + random-tag guessing`，这些项服务于 challenge-user UnSC 模拟。
+- 全局多会话 “同一 mu 替代 sigma” 认证性质放到 `AUTHENTICITY_THEOREM.md`，使用 multi-key HMAC UF-CMA。
+- 不得把 multi-key HMAC UF-CMA 同时再塞入 Type-II confidentiality 的 `delta_II`，否则重复计项。
+
+## 12. Reviewer checklist
+
+- [x] `H1(ID*)` 完全诚实采样；
+- [x] `c=h*+s` 且显式支付 `Pr[c=0]=1/q`；
+- [x] 用户公钥 embedding 猜测对象收紧为 `N_U` 个 user-key instantiation，而不是所有 H1 查询；
+- [x] challenge-state Signcrypt 的 `U=U*` 重随机碰撞单独计为 `q_sc*/(q-1)`；
+- [x] 普通 `L_SC` 记录的 alternate signature 可由存储 `K_M` 精确回答，不再误算为 HMAC bad event；
+- [x] challenge `mu*` 的 alternate signature 用单目标 HMAC PRF + `q_usc*/2^kappa` 处理；
+- [x] `Ask*` 的半优势系数严格为 2；
+- [x] plain-CDH 保留 `1/q_K` extraction loss；
+- [x] 运行时间中 `q_K` candidate 不再错误地每项计 G1 标量乘；
+- [x] 与独立 multi-key authenticity theorem 去重。
