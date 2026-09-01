@@ -1,5 +1,5 @@
 {
-  "status": "CI_MEASURED",
+  "status": "SUBMISSION_MEASURED",
   "python_reference": {
     "purpose": "equation-aligned functional prototype only",
     "repository": "https://github.com/gongxian-ding/gmssl-python",
@@ -32,6 +32,24 @@
     "warmup": 10,
     "iterations_per_size_phase": 50,
     "message_bytes": [20, 128, 1024, 4096],
+    "raw_sample_rows": 1800,
+    "evidence_validation": "PASS"
+  },
+  "submission_benchmark": {
+    "status": "MEASURED",
+    "classification": "physical target-machine benchmark used for manuscript performance results",
+    "run_id": "ryzen8845h-20260901-131213",
+    "target_platform": "Lenovo XiaoXinPro 16 AHP9 / AMD Ryzen 7 8845H / Windows 11 10.0.26200",
+    "logical_cpu_count": 16,
+    "v2_commit": "b63cf0480a9e659e8717e9aa2fefce35c1702d82",
+    "gmssl_commit": "24ae482701a7b124826c382fffc55c19f76d475d",
+    "gmssl_build_options": ["-DENABLE_SM9=ON", "-DENABLE_SM2_AMD64=OFF"],
+    "compiler": "MSYS2 UCRT64 GCC 16.2.0",
+    "cmake": "4.4.3",
+    "build_type": "Release",
+    "warmup": 1000,
+    "iterations_per_size_phase": 1000,
+    "message_bytes": [20, 128, 1024, 4096],
     "phases": [
       "receiver_keygen",
       "offline_signcrypt",
@@ -43,14 +61,12 @@
       "sm9_pairing",
       "sm9_gt_exp"
     ],
-    "raw_sample_rows": 1800,
-    "evidence_validation": "PASS"
-  },
-  "submission_benchmark": {
-    "status": "NOT_MEASURED",
-    "target_platform": "Lenovo XiaoXinPro 16 AHP9 / AMD Ryzen 7 8845H / Windows",
-    "minimum_warmup": 1000,
-    "minimum_iterations_per_size_phase": 10000,
-    "rule": "Do not populate manuscript submission-performance tables until the target-machine run is complete and its raw evidence is archived."
+    "raw_sample_rows": 36000,
+    "raw_sha256": "810db51e31bb54a3ebee7bcd7cf1157462c18c43f6d4f4f4e914968c5ba66559",
+    "summary_sha256": "62daba90689ba72ce2e3e45a3ac85de73a0a2e170fb5e4752209db51932cec58",
+    "environment_sha256": "60fe4e5d89a308298ae22d2c3ee144b8d7dda4b5b93c875a8afa3ae7dd1fc762",
+    "evidence_zip_sha256": "c9e73332441a5f73871413f212ab36afa4fe7a58ef84f0bcfe75ec555a193ca4",
+    "evidence_validation": "PASS",
+    "source_note": "The V2 source was obtained as the feat/native-gmssl-v2 branch ZIP because git clone timed out on the target machine. The benchmark records the branch head commit b63cf0480a9e659e8717e9aa2fefce35c1702d82 explicitly; environment git_head is unavailable because ZIP archives do not contain .git metadata."
   }
 }
