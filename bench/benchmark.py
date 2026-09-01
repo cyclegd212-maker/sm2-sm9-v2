@@ -1,9 +1,20 @@
 """Benchmark driver. It writes raw samples; it never fabricates missing timings."""
 from __future__ import annotations
-import argparse, csv, statistics, time
+
+import argparse
+import time
 from pathlib import Path
 
-from src.v2_scheme import setup_sm9, sender_keygen, receiver_keygen, validate_receiver_key, offline_signcrypt, online_signcrypt, unsigncrypt
+from bench.results import append_raw_rows, rebuild_summary
+from src.v2_scheme import (
+    offline_signcrypt,
+    online_signcrypt,
+    receiver_keygen,
+    sender_keygen,
+    setup_sm9,
+    unsigncrypt,
+    validate_receiver_key,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw" / "timings.csv"
@@ -16,20 +27,15 @@ def ns_call(fn, *args):
     return result, time.perf_counter_ns() - t0
 
 
-def percentile(xs, p):
-    ys = sorted(xs)
-    if not ys:
-        return None
-    idx = min(len(ys)-1, max(0, int(round((len(ys)-1)*p))))
-    return ys[idx]
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--iterations", type=int, default=1000)
     ap.add_argument("--warmup", type=int, default=100)
     ap.add_argument("--message-bytes", type=int, default=128)
     args = ap.parse_args()
+
+    if args.iterations < 1 or args.warmup < 0 or args.message_bytes < 0:
+        raise SystemExit("iterations must be >=1; warmup and message-bytes must be >=0")
 
     master_public, master_secret = setup_sm9()
     sender = sender_keygen()
@@ -55,26 +61,11 @@ def main():
             (i, args.message_bytes, "unsigncrypt", t_un),
         ])
 
-    RAW.parent.mkdir(parents=True, exist_ok=True)
-    with RAW.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["iteration", "message_bytes", "stage", "elapsed_ns"])
-        w.writerows(rows)
-
-    by_stage = {}
-    for _, _, stage, elapsed in rows:
-        by_stage.setdefault(stage, []).append(elapsed)
-    SUMMARY.parent.mkdir(parents=True, exist_ok=True)
-    with SUMMARY.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["message_bytes", "stage", "n", "mean_ns", "median_ns", "stdev_ns", "p95_ns"])
-        for stage, xs in sorted(by_stage.items()):
-            w.writerow([
-                args.message_bytes, stage, len(xs), statistics.mean(xs), statistics.median(xs),
-                statistics.stdev(xs) if len(xs) > 1 else 0, percentile(xs, .95)
-            ])
+    append_raw_rows(RAW, rows)
+    rebuild_summary(RAW, SUMMARY)
     print(f"raw: {RAW}")
     print(f"summary: {SUMMARY}")
+
 
 if __name__ == "__main__":
     main()

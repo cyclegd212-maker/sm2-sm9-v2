@@ -1,0 +1,27 @@
+# V2 密码学审稿攻击矩阵
+
+本文档把 V2 当作待投稿密码学方案进行敌对式审查。结论分为：已通过代码/CI 证据验证的实现性质、已经完成基础假设映射的证明性质、以及仍属于理论残余风险的问题。不得把实现测试等同于困难性证明。
+
+| ID | Concern | Severity | Attack / Failure Mode | Current Evidence | Resolution | Residual Risk |
+|---|---|---:|---|---|---|---|
+| R1 | Type-I-KSR 弱于经典 Type-I ReplacePublicKey | Major | 经典 certificateless Type-I 往往允许攻击者替换公开密钥，而不要求替换值必须写成已知 `x'` 的 `X'=[x']Q`；V2 仅覆盖 known-secret replacement。 | `TYPE_I_KSR_MODEL.md` 与 native knowledge-path test 都明确攻击者知道 `x'`，故可算 `Z2=[x']U`。 | 标题、摘要、定理统一写 **Known-Secret Public-Key Replacement (Type-I-KSR)**；不使用 “standard Type-I / arbitrary replacement / full certificateless Type-I”。 | **当前最大理论风险仍在。** 若目标期刊要求经典 CL-PKC 强模型，需要重新设计或另证更强模型。 |
+| R2 | Type-I 身份因子是否真正下钻到基础困难假设 | Major → Resolved for stated model | 若只定义“SM9-ID-KEM 安全”，会被认为把核心困难重新命名。 | 已逐式核对 Cheng, *Security Analysis of SM9 Key Agreement and Encryption*, Theorem 4（INSCRYPT 2018, DOI `10.1007/978-3-030-14234-6_1`）：SM9-KEM 在 ROM 下归约到 `Gap-q-BCAA1_{1,2}`，且 `Adv_Gap >= epsilon/(q1+1)`；挑战身份 KDF 查询数进入 DBIDH 检测运行时间，而非额外 `1/q_K` 优势损失。V2 的 `Z1=e(U,d_B)=g^rho` 与 Cheng 的隐藏 `t` 完全一致；KSR 下 `Z2=[x_B]U` 可计算。 | `TYPE_I_KSR_REDUCTION.md` 给出 public-auxiliary-input extension、challenge/decap/KDF 表模拟和完整主优势界。论文应明确写 **Gap-q-BCAA1_{1,2} in ROM**。 | 不能把 Gap-BCAA 擅自改写成普通 `q-BDHI`；Gap oracle 与假设强度本身可能成为审稿讨论点。 |
+| R3 | Type-II CDH 嵌入可能被恶意 KGC 识别 | Major | 若强制编程 `H1(ID*)=1-s` 使 `Q*=P`，Type-II 已知 `s`，可识别挑战身份分布异常。 | 当前证明使用缩放嵌入：诚实采样 `h*`，`c=h*+s`; `Q*=cP,U*=c[a]P,X*=c[b]P,Z2*=c[ab]P`。 | 保留缩放嵌入，并显式计入 `Pr[c=0]=1/q`；成功后输出 `[c^{-1}]Z2*=[ab]P`。 | 仍需把 Type-II 每个 oracle 表、challenge equivalence 与查询一致性写到与 Type-I 同一精度。 |
+| R4 | Type-II 正确 KDF 查询的 query-extraction 损失 | Major | plain-CDH simulator 不知道 `Z2*`，也没有 DDH/gap oracle 测试任意候选 `Z2`；因此不能照搬 Type-I Cheng reduction。 | `TYPE_II_CDH_REDUCTION.md` 已区分该能力差异。 | 若坚持 plain CDH，显式定义关键 KDF-query extraction/guessing 事件及 `q_K` 损失；若改用 gap-CDH/DDH-assisted reduction，则必须明确假设改变。 | 具体 Type-II 常数仍待最终 game 序列冻结。**不要把 Type-I 的“q_K 只进运行时间”错误套到 Type-II。** |
+| R5 | HMAC 多会话多密钥与单目标 confidentiality 混淆 | Major | 每个 token 派生独立 `K_M`；若在多会话 authenticity theorem 中直接套单密钥 UF-CMA 会漏损失。 | `TYPE_I_KSR_REDUCTION.md` 已把机密性与不可伪造性分开：单 challenge-session DEM confidentiality 可做 target-session PRF reduction；完整多会话 authenticity 才需要 multi-key HMAC 或会话猜测。 | Confidentiality 主界使用 one-time DEM/HMAC-PRF 项；Authenticity 单独使用 SM2 EUF-CMA + multi-key HMAC UFCMA/PRF。 | 仍需单独完成完整 authenticity theorem，不能把 confidentiality theorem 当作全功能 signcryption security。 |
+| R6 | 同消息的新随机化 SM2 签名不属于 ordinary EUF-CMA 新消息伪造 | Major | 对已签过 `mu` 产生不同合法 SM2 `(r,s)`，不能作为普通 EUF-CMA 新消息事件。 | `tau=HMAC_{K_M}(mu||sigma)` 绑定具体签名；signature/tag tamper tests 均拒绝。 | 在 authenticity theorem 中：新 `mu` 归 SM2 EUF-CMA；同 `mu` 新 `sigma` 若要形成可接受 ciphertext，还必须突破 HMAC binding。 | 不声明 strong unforgeability，除非另行证明。 |
+| R7 | SM3-KDF 与 ROM 的措辞可能过强 | Major | “实际使用 SM3-KDF”与“证明中是随机预言机”不是同一事实。 | 实现使用域分离 SM3-KDF；Cheng Theorem 4 本身也明确在 random-oracle model。 | 统一写：**The domain-separated SM3-KDF/hash-to-range instances are modeled as random oracles for the proof.** | 不得声称标准 SM3 已被证明等价于随机预言机。 |
+| R8 | 公钥替换后的机密性不等于可用性 | Moderate | Type-I 替换 `X_B` 后，原用户不持有新 `x'_B`，通信可能 DoS。 | KSR 游戏与代码知识路径均不声明 availability。 | challenge 固化 `(ID_B*,X_B*,x_B*,version*)` 快照；confidentiality 与 availability 分离。 | 应避免“替换后原用户仍可正常解密”等措辞。 |
+| R9 | XOR + KDF 的 DEM 需要真实 CCA 组合逻辑 | Major → Tightened | 单纯 `C=M xor stream` 没有完整性；若 CCA proof 依赖含糊的“签名门控”容易循环论证。 | native UnSC 验证顺序与 tamper tests 已确认；理论上可把 target DEM 写成 `H_E(K_E,ctx)` one-time stream + `HMAC_{K_M}(mu||sigma)`。 | `TYPE_I_KSR_REDUCTION.md` 给出 FG-CCA 风格界：HMAC-PRF switching + `q_D/2^256` tag guess + `q_E/2^256` correct-key hash query。SM2 验签只缩小接受集合，不必作为 confidentiality 主假设。 | 需要在论文中固定 DEM game 的精确定义和 `q_D,q_E` 记号，避免与 KEM decapsulation `q_D` 混名。 |
+| R10 | 完整 offline token 泄漏暴露 SM2 nonce `k` | Major | token 中保存完整 SM2 precompute `(k,x_R)`；若 token 泄漏且观察相应签名，长期私钥可能受威胁。 | token 生命周期强制 `READY -> CONSUMED`，失败路径清零，重复使用测试拒绝。 | 明确 **secure one-time offline token assumption**；不声明 token-leakage resilience。 | 仍不抵抗完整 token 泄漏；真实部署需原子存储/TEE/HSM 等工程措施。 |
+| R11 | 异常/SM2 retry 后 token 不得恢复 READY | Major | 回滚 token 会导致 nonce/session material 重用。 | native `v2_online_signcrypt` 在消息相关密码运算前消费 token，结尾清除 `K_E,K_M,k`。 | 保持 fail-closed 生命周期并在论文算法中明确“异常也销毁”。 | 进程崩溃与持久化恢复需部署层保证原子性。 |
+| R12 | 实验性能数据可能混合平台/commit/构建选项 | Major | 仅记录 commit 而漏 CMake 选项会导致同一代码不同汇编路径不可比；Windows MinGW 的 `ENABLE_SM2_AMD64=ON` 已实证使 pinned GmSSL `sm2_sign` 上游测试 SegFault。 | 单变量复现实验：Windows-2025 + MinGW GCC 15.2，仅关闭 `ENABLE_SM2_AMD64` 后，SM2/SM3/HMAC/SM9 upstream tests、全部 native tests 和真实 20B benchmark smoke 全绿。Linux CI 证据包已有 raw/summary/env/log 可重算。 | Windows submission runner 固定 `-DENABLE_SM9=ON;-DENABLE_SM2_AMD64=OFF`，并把 exact build options 写入 `environment.json` 与 hashes；最终 Ryzen 数据仍须独立生成与审计。 | 关闭汇编优化会影响绝对 SM2 性能，因此投稿必须报告该选项；若以后改用 MSVC/其他 toolchain，必须作为新的实验配置重新全量测量，不能与旧数据混表。 |
+
+## 当前审稿结论
+
+- **实现层面**：native GmSSL 3.x 原型已通过 Linux 与稳定化 Windows 路径的 correctness/adversarial tests；Windows MinGW 的 SM2 崩溃已定位到 pinned GmSSL `SM2_AMD64` 汇编路径，而非 V2 协议。
+- **Type-I 证明层面**：原先最大的“SM9-ID-KEM 只是模块化假设”问题已经下钻：V2 `Z1` 精确映射到 Cheng SM9-KEM hidden value，基础假设是 **Gap-q-BCAA1_{1,2} in ROM**；`q_K` 在该 Gap reduction 中进入运行时间，不形成 query-index advantage loss。
+- **Type-II 证明层面**：scaled CDH embedding 仍合理，但 plain-CDH 下的关键 `Z2` query extraction 需要继续给出完整 oracle-level 概率核算。
+- **当前投稿风险排序**：`R1 Type-I-KSR 模型强度` > `R4 Type-II query extraction / 完整优势界` > `R5/R6 authenticity theorem` > 其余工程与措辞问题。
+
+因此，当前可以声称“Type-I-KSR confidentiality 在 ROM 下可归约到 Gap-q-BCAA1_{1,2}”，但仍不能声称“经典最强 Type-I security”或“q-BDHI-based security”。

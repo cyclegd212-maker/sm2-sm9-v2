@@ -23,3 +23,16 @@ def test_benchmark_runners_use_module_mode():
     ps = (ROOT / "scripts" / "run_all.ps1").read_text(encoding="utf-8")
     assert "python -m bench.benchmark" in sh
     assert "python -m bench.benchmark" in ps
+
+
+def test_windows_submission_records_stable_gmssl_sm2_configuration():
+    script = (ROOT / "native" / "scripts" / "run_submission_windows.ps1").read_text(encoding="utf-8")
+    assert '"-DENABLE_SM2_AMD64=OFF"' in script
+    assert '--gmssl-build-options=' in script
+    assert '-DENABLE_SM9=ON;-DENABLE_SM2_AMD64=OFF' in script
+
+
+def test_windows_submission_exposes_installed_gmssl_dll_directory():
+    script = (ROOT / "native" / "scripts" / "run_submission_windows.ps1").read_text(encoding="utf-8")
+    assert "Join-Path $GmSSLInstall \"bin\"" in script
+    assert '$env:PATH = "$GmSSLBin;$env:PATH"' in script

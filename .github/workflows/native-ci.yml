@@ -1,0 +1,211 @@
+name: native-ci
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GMSSL_COMMIT: 24ae482701a7b124826c382fffc55c19f76d475d
+  CI_WARMUP: "10"
+  CI_ITERATIONS: "50"
+
+jobs:
+  upstream-gmssl-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout V2 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Run Python source and benchmark regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -q pytest
+          python -m pytest -q \
+            tests/test_source_contract.py \
+            tests/test_benchmark_results.py \
+            tests/test_native_summary.py 2>&1 | tee artifacts/python-tests.log
+
+      - name: Checkout pinned GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL 2>&1 | tee artifacts/gmssl-clone.log
+          git -C _deps/GmSSL checkout "$GMSSL_COMMIT" 2>&1 | tee -a artifacts/gmssl-clone.log
+          test "$(git -C _deps/GmSSL rev-parse HEAD)" = "$GMSSL_COMMIT"
+
+      - name: Configure and build pinned GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_SM9=ON 2>&1 | tee artifacts/gmssl-configure.log
+          cmake --build _deps/GmSSL/build --config Release -j2 2>&1 | tee artifacts/gmssl-build.log
+
+      - name: Run pinned upstream SM2 SM3 HMAC SM9 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir _deps/GmSSL/build \
+            -R '^(sm2_sign|sm3|sm3_hmac|sm9)$' \
+            --output-on-failure 2>&1 | tee artifacts/upstream-tests.log
+
+      - name: Upload upstream evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-gmssl-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+
+  native-correctness:
+    needs: upstream-gmssl-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout V2 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Build and install pinned GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL >/dev/null 2>&1
+          git -C _deps/GmSSL checkout "$GMSSL_COMMIT" >/dev/null 2>&1
+          test "$(git -C _deps/GmSSL rev-parse HEAD)" = "$GMSSL_COMMIT"
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/_deps/gmssl-install" \
+            -DENABLE_SM9=ON 2>&1 | tee artifacts/gmssl-configure.log
+          cmake --build _deps/GmSSL/build --config Release -j2 2>&1 | tee artifacts/gmssl-build.log
+          cmake --install _deps/GmSSL/build 2>&1 | tee artifacts/gmssl-install.log
+
+      - name: Build native V2 Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGMSSL_ROOT="$GITHUB_WORKSPACE/_deps/gmssl-install" 2>&1 | tee artifacts/native-configure.log
+          cmake --build native/build --config Release -j2 2>&1 | tee artifacts/native-build.log
+
+      - name: Run native correctness and adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir native/build --output-on-failure 2>&1 | tee artifacts/native-tests.log
+
+      - name: Upload native correctness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-correctness-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+
+  native-benchmark:
+    needs: [upstream-gmssl-tests, native-correctness]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact V2 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Prepare benchmark evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          rm -f artifacts/raw.csv artifacts/summary.csv artifacts/benchmark.log
+
+      - name: Build pinned GmSSL for benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL 2>&1 | tee artifacts/gmssl-clone.log
+          git -C _deps/GmSSL checkout "$GMSSL_COMMIT" 2>&1 | tee -a artifacts/gmssl-clone.log
+          test "$(git -C _deps/GmSSL rev-parse HEAD)" = "$GMSSL_COMMIT"
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/_deps/gmssl-install" \
+            -DENABLE_SM9=ON 2>&1 | tee artifacts/gmssl-configure.log
+          cmake --build _deps/GmSSL/build --config Release -j2 2>&1 | tee artifacts/build.log
+          ctest --test-dir _deps/GmSSL/build \
+            -R '^(sm2_sign|sm3|sm3_hmac|sm9)$' \
+            --output-on-failure 2>&1 | tee artifacts/upstream-tests.log
+          cmake --install _deps/GmSSL/build 2>&1 | tee artifacts/gmssl-install.log
+
+      - name: Build and verify native V2 for benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGMSSL_ROOT="$GITHUB_WORKSPACE/_deps/gmssl-install" 2>&1 | tee artifacts/native-configure.log
+          cmake --build native/build --config Release -j2 2>&1 | tee artifacts/native-build.log
+          ctest --test-dir native/build --output-on-failure 2>&1 | tee artifacts/native-tests.log
+
+      - name: Collect environment metadata
+        shell: bash
+        env:
+          V2_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          RUN_ID="gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python native/scripts/collect_env.py \
+            --output artifacts/environment.json \
+            --run-id "$RUN_ID" \
+            --v2-commit "$V2_SHA" \
+            --gmssl-commit "$GMSSL_COMMIT" \
+            --build-type Release \
+            --warmup "$CI_WARMUP" \
+            --iterations "$CI_ITERATIONS" 2>&1 | tee artifacts/environment.log
+
+      - name: Run real CI benchmark for all message sizes
+        shell: bash
+        env:
+          V2_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          RUN_ID="gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          for size in 20 128 1024 4096; do
+            echo "=== message_bytes=$size ===" | tee -a artifacts/benchmark.log
+            native/build/bench_v2 \
+              --run-id "$RUN_ID" \
+              --commit "$V2_SHA" \
+              --gmssl-commit "$GMSSL_COMMIT" \
+              --message-bytes "$size" \
+              --warmup "$CI_WARMUP" \
+              --iterations "$CI_ITERATIONS" \
+              --raw artifacts/raw.csv 2>&1 | tee -a artifacts/benchmark.log
+          done
+          python -m native.bench.summarize artifacts/raw.csv artifacts/summary.csv 2>&1 | tee artifacts/summary.log
+          python -m native.bench.validate_evidence \
+            artifacts/raw.csv artifacts/summary.csv \
+            --sizes 20,128,1024,4096 \
+            --iterations "$CI_ITERATIONS" 2>&1 | tee artifacts/evidence-validation.log
+
+      - name: Upload reproducible CI benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/
+          if-no-files-found: error

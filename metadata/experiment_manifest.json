@@ -1,12 +1,72 @@
 {
-  "status": "NOT_MEASURED",
-  "reason": "No real benchmark run has been executed in this artifact build environment.",
-  "reference_gmssl_repository": "https://github.com/gongxian-ding/gmssl-python",
-  "reference_gmssl_commit": "498ba0545a3f7667ab4575e93cd10e9b19baf4f0",
-  "required_outputs_after_real_run": [
-    "data/raw/timings.csv",
-    "data/processed/summary.csv",
-    "metadata/environment.json",
-    "logs/run.log"
-  ]
+  "status": "SUBMISSION_MEASURED",
+  "python_reference": {
+    "purpose": "equation-aligned functional prototype only",
+    "repository": "https://github.com/gongxian-ding/gmssl-python",
+    "commit": "498ba0545a3f7667ab4575e93cd10e9b19baf4f0",
+    "performance_authoritative": false
+  },
+  "native_reference": {
+    "library": "GmSSL 3.x",
+    "repository": "https://github.com/guanzhi/GmSSL",
+    "commit": "24ae482701a7b124826c382fffc55c19f76d475d"
+  },
+  "ci_reproducibility_benchmark": {
+    "status": "MEASURED",
+    "classification": "CI reproducibility benchmark; not submission-platform evidence",
+    "workflow_run_id": "33383426286",
+    "run_id": "gha-33383426286-1",
+    "v2_commit": "c0f3247fea828c37970dbf03f66c5aa18bc3e837",
+    "gmssl_commit": "24ae482701a7b124826c382fffc55c19f76d475d",
+    "artifact_id": "9754694893",
+    "artifact_name": "v2-ci-evidence-c0f3247fea828c37970dbf03f66c5aa18bc3e837",
+    "artifact_sha256": "ac8890926e1a859a02323ea412ce2d6346e7e8fda46f14406e06539c1349dbb9",
+    "raw_sha256": "696e020b116e47ff359fa5ed8cf9d6504c6314a3c3057433de5ba879803ba49d",
+    "summary_sha256": "b875325b109ea1ed567e6ff9da5d70470b63a8aca094529c4219c7485afccca2",
+    "runner_cpu": "AMD EPYC 7763 64-Core Processor",
+    "runner_logical_cpu_count": 4,
+    "runner_os": "Ubuntu 24.04 / Linux 6.17.0-1022-azure",
+    "compiler": "GCC 13.3.0",
+    "cmake": "3.31.6",
+    "build_type": "Release",
+    "warmup": 10,
+    "iterations_per_size_phase": 50,
+    "message_bytes": [20, 128, 1024, 4096],
+    "raw_sample_rows": 1800,
+    "evidence_validation": "PASS"
+  },
+  "submission_benchmark": {
+    "status": "MEASURED",
+    "classification": "physical target-machine benchmark used for manuscript performance results",
+    "run_id": "ryzen8845h-20260901-131213",
+    "target_platform": "Lenovo XiaoXinPro 16 AHP9 / AMD Ryzen 7 8845H / Windows 11 10.0.26200",
+    "logical_cpu_count": 16,
+    "v2_commit": "b63cf0480a9e659e8717e9aa2fefce35c1702d82",
+    "gmssl_commit": "24ae482701a7b124826c382fffc55c19f76d475d",
+    "gmssl_build_options": ["-DENABLE_SM9=ON", "-DENABLE_SM2_AMD64=OFF"],
+    "compiler": "MSYS2 UCRT64 GCC 16.2.0",
+    "cmake": "4.4.3",
+    "build_type": "Release",
+    "warmup": 1000,
+    "iterations_per_size_phase": 1000,
+    "message_bytes": [20, 128, 1024, 4096],
+    "phases": [
+      "receiver_keygen",
+      "offline_signcrypt",
+      "online_signcrypt",
+      "sender_total",
+      "unsigncrypt",
+      "sm2_fixed_base_mul",
+      "sm9_g1_mul",
+      "sm9_pairing",
+      "sm9_gt_exp"
+    ],
+    "raw_sample_rows": 36000,
+    "raw_sha256": "810db51e31bb54a3ebee7bcd7cf1157462c18c43f6d4f4f4e914968c5ba66559",
+    "summary_sha256": "62daba90689ba72ce2e3e45a3ac85de73a0a2e170fb5e4752209db51932cec58",
+    "environment_sha256": "60fe4e5d89a308298ae22d2c3ee144b8d7dda4b5b93c875a8afa3ae7dd1fc762",
+    "evidence_zip_sha256": "c9e73332441a5f73871413f212ab36afa4fe7a58ef84f0bcfe75ec555a193ca4",
+    "evidence_validation": "PASS",
+    "source_note": "The V2 source was obtained as the feat/native-gmssl-v2 branch ZIP because git clone timed out on the target machine. The benchmark records the branch head commit b63cf0480a9e659e8717e9aa2fefce35c1702d82 explicitly; environment git_head is unavailable because ZIP archives do not contain .git metadata."
+  }
 }

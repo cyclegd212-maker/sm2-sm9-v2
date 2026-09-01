@@ -1,0 +1,36 @@
+name: windows-submission-script-check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  powershell-parse:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Checkout V2 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Parse submission PowerShell without executing benchmark
+        shell: pwsh
+        run: |
+          $Path = Join-Path $PWD 'native\scripts\run_submission_windows.ps1'
+          $Tokens = $null
+          $Errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $Path,
+              [ref]$Tokens,
+              [ref]$Errors
+          )
+          if ($Errors.Count -ne 0) {
+              $Errors | Format-List | Out-String | Write-Error
+              exit 1
+          }
+          Write-Host "PowerShell parser: OK"
