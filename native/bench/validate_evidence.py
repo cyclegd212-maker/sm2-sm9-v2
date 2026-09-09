@@ -17,6 +17,8 @@ EXPECTED_PHASES = {
     "unsigncrypt",
     "sm2_fixed_base_mul",
     "sm9_g1_mul",
+    "sm9_g1_add",
+    "sm9_qb_compute",
     "sm9_pairing",
     "sm9_gt_exp",
 }
