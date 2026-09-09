@@ -341,6 +341,17 @@ int main(int argc, char **argv)
         if (!row(fp, &opt, "sm9_g1_mul", i, t1 - t0)) goto iteration_error;
 
         t0 = now_ns();
+        sm9_z256_point_add(&sm9_point, &q_b, &receiver.X_b);
+        t1 = now_ns();
+        if (!sm9_z256_point_is_on_curve(&sm9_point)) goto iteration_error;
+        if (!row(fp, &opt, "sm9_g1_add", i, t1 - t0)) goto iteration_error;
+
+        t0 = now_ns();
+        if (v2_compute_qb(&pp, id_b, sizeof(id_b) - 1, &sm9_point) != V2_OK) goto iteration_error;
+        t1 = now_ns();
+        if (!row(fp, &opt, "sm9_qb_compute", i, t1 - t0)) goto iteration_error;
+
+        t0 = now_ns();
         sm9_z256_pairing(gt, &receiver.identity_key.de, &ct.U);
         t1 = now_ns();
         if (!row(fp, &opt, "sm9_pairing", i, t1 - t0)) goto iteration_error;
