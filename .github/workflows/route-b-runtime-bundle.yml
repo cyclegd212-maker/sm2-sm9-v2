@@ -1,0 +1,45 @@
+name: route-b-runtime-bundle
+on:
+  push:
+    branches: ['audit/route-b-runtime-20260911']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned upstream and run vector tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/logs
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL 2>&1 | tee bundle/logs/clone.log
+          git -C _deps/GmSSL checkout 24ae482701a7b124826c382fffc55c19f76d475d
+          test "$(git -C _deps/GmSSL rev-parse HEAD)" = 24ae482701a7b124826c382fffc55c19f76d475d
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build -DCMAKE_BUILD_TYPE=Release -DENABLE_SM9=ON -DENABLE_SM2_AMD64=OFF -DCMAKE_INSTALL_PREFIX="$PWD/bundle/gmssl" 2>&1 | tee bundle/logs/gmssl-configure.log
+          cmake --build _deps/GmSSL/build -j2 2>&1 | tee bundle/logs/gmssl-build.log
+          ctest --test-dir _deps/GmSSL/build -R '^(sm2_sign|sm3|sm3_hmac|sm9)$' --output-on-failure 2>&1 | tee bundle/logs/upstream-tests.log
+          cmake --install _deps/GmSSL/build 2>&1 | tee bundle/logs/install.log
+      - name: Build and test unchanged pinned protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/build -DCMAKE_BUILD_TYPE=Release -DGMSSL_ROOT="$PWD/bundle/gmssl" 2>&1 | tee bundle/logs/v2-configure.log
+          cmake --build native/build -j2 2>&1 | tee bundle/logs/v2-build.log
+          ctest --test-dir native/build --output-on-failure 2>&1 | tee bundle/logs/v2-tests.log
+          cp -a native bundle/native
+          cp _deps/GmSSL/LICENSE bundle/GMSSL_LICENSE
+          { echo "Purpose: build/runtime bundle, NOT a Ryzen benchmark"; echo "V2 protocol source: aab3316ea1a53146d4b24821b8ee3998e1b950c1"; echo "GmSSL: 24ae482701a7b124826c382fffc55c19f76d475d"; git rev-parse HEAD; uname -a; gcc --version; cmake --version; } > bundle/build-environment.txt
+          find bundle -type f -print0 | sort -z | xargs -0 sha256sum > bundle-files.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: route-b-runtime-${{ github.sha }}
+          path: |
+            bundle/
+            bundle-files.sha256
+          if-no-files-found: error
+          retention-days: 14
