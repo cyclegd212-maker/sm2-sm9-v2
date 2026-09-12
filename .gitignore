@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 _deps/
 native/build/
+native/build-pchs-liu2018/
 artifacts/
 # Preserve experiment evidence directories but not accidental temp files
 logs/*.tmp
