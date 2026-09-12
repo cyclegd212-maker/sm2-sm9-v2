@@ -85,6 +85,15 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bench_v2 PRIVATE -Wall -Wextra -Werror)
 endif()
 
+add_executable(bench_pchs_liu2018 bench/bench_pchs_liu2018.c)
+target_include_directories(bench_pchs_liu2018 PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(bench_pchs_liu2018 PRIVATE pchs_liu2018)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bench_pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
+endif()
+
 add_test(
     NAME benchmark_smoke
     COMMAND bench_v2
