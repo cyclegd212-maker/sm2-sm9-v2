@@ -1,0 +1,50 @@
+name: pchs-ci
+
+on:
+  push:
+    branches: [benchmark-liu2018-pchs]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GMSSL_COMMIT: 24ae482701a7b124826c382fffc55c19f76d475d
+
+jobs:
+  pchs-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout benchmark branch
+        uses: actions/checkout@v4
+
+      - name: Build and install pinned GmSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/guanzhi/GmSSL.git _deps/GmSSL
+          git -C _deps/GmSSL checkout "$GMSSL_COMMIT"
+          test "$(git -C _deps/GmSSL rev-parse HEAD)" = "$GMSSL_COMMIT"
+          cmake -S _deps/GmSSL -B _deps/GmSSL/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/_deps/gmssl-install" \
+            -DENABLE_SM9=ON
+          cmake --build _deps/GmSSL/build --config Release -j2
+          cmake --install _deps/GmSSL/build
+
+      - name: Configure native tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGMSSL_ROOT="$GITHUB_WORKSPACE/_deps/gmssl-install"
+
+      - name: Build native tree
+        shell: bash
+        run: cmake --build native/build --config Release -j2
+
+      - name: Run native tests
+        shell: bash
+        run: ctest --test-dir native/build --output-on-failure
