@@ -38,6 +38,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(v2_scheme PRIVATE -Wall -Wextra -Werror)
 endif()
 
+add_library(pchs_liu2018 STATIC
+    src/pchs_liu2018.c)
+target_include_directories(pchs_liu2018 PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(pchs_liu2018 PUBLIC "${GMSSL_LIBRARY}")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
+endif()
+
 function(v2_test_target name source)
     add_executable(${name} ${source})
     target_include_directories(${name} PRIVATE
@@ -60,7 +70,7 @@ add_executable(test_pchs_liu2018 tests/test_pchs_liu2018.c)
 target_include_directories(test_pchs_liu2018 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${GMSSL_INCLUDE_DIR}")
-target_link_libraries(test_pchs_liu2018 PRIVATE "${GMSSL_LIBRARY}")
+target_link_libraries(test_pchs_liu2018 PRIVATE pchs_liu2018)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
 endif()
