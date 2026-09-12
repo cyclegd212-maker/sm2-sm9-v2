@@ -56,3 +56,18 @@ jobs:
           set -euo pipefail
           python scripts/summarize_pchs_liu2018.py --self-test
           python scripts/compare_v2_pchs.py --self-test
+
+      - name: Parse Windows benchmark script
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            "scripts/run_pchs_liu2018_windows.ps1",
+            [ref]$tokens,
+            [ref]$errors)
+          if ($errors.Count -ne 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "PowerShell parser: ok"
