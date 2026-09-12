@@ -95,3 +95,14 @@ add_test(
         --warmup 0
         --iterations 1
         --raw "${CMAKE_CURRENT_BINARY_DIR}/benchmark-smoke.csv")
+
+add_test(
+    NAME benchmark_pchs_smoke
+    COMMAND bench_pchs_liu2018
+        --run-id smoke-pchs
+        --commit smoke-pchs
+        --gmssl-commit smoke-gmssl
+        --message-bytes 20
+        --warmup 0
+        --iterations 1
+        --raw "${CMAKE_CURRENT_BINARY_DIR}/benchmark-pchs-smoke.csv")
