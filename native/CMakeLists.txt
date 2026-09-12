@@ -56,6 +56,16 @@ v2_test_target(test_sm2_precomp tests/test_sm2_precomp.c)
 v2_test_target(test_signcryption tests/test_signcryption.c)
 v2_test_target(test_attacks tests/test_attacks.c)
 
+add_executable(test_pchs_liu2018 tests/test_pchs_liu2018.c)
+target_include_directories(test_pchs_liu2018 PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(test_pchs_liu2018 PRIVATE "${GMSSL_LIBRARY}")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
+endif()
+add_test(NAME pchs_api_roundtrip COMMAND test_pchs_liu2018)
+
 add_executable(bench_v2 bench/bench_v2.c)
 target_include_directories(bench_v2 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
