@@ -29,7 +29,8 @@ jobs:
           cmake -S _deps/GmSSL -B _deps/GmSSL/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/_deps/gmssl-install" \
-            -DENABLE_SM9=ON
+            -DENABLE_SM9=ON \
+            -DENABLE_SM2_AMD64=OFF
           cmake --build _deps/GmSSL/build --config Release -j2
           cmake --install _deps/GmSSL/build
 
@@ -48,3 +49,10 @@ jobs:
       - name: Run native tests
         shell: bash
         run: ctest --test-dir native/build --output-on-failure
+
+      - name: Run statistics self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/summarize_pchs_liu2018.py --self-test
+          python scripts/compare_v2_pchs.py --self-test
