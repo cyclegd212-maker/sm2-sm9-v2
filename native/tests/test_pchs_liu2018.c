@@ -148,6 +148,99 @@ cleanup:
     return ok;
 }
 
+static int decrypt_rejects(
+    const PCHS_PUBLIC_PARAMS *pp,
+    const PCHS_PKI_KEY *sender,
+    const PCHS_CLC_KEY *receiver,
+    const PCHS_CIPHERTEXT *ct,
+    uint8_t *out,
+    size_t out_capacity)
+{
+    size_t outlen = out_capacity;
+    memset(out, 0, out_capacity);
+    return pchs_unsigncrypt(pp, sender, receiver, ct, out, &outlen) == PCHS_ERR;
+}
+
+static int tamper_rejection(void)
+{
+    enum { N = 128 };
+    PCHS_MASTER_KEY msk;
+    PCHS_PUBLIC_PARAMS pp;
+    PCHS_PKI_KEY sender;
+    PCHS_PKI_KEY wrong_sender;
+    PCHS_CLC_KEY receiver;
+    PCHS_CLC_KEY wrong_receiver;
+    PCHS_CIPHERTEXT ct;
+    static const uint8_t id[] = "Bob";
+    uint8_t message[N];
+    uint8_t out[N];
+    uint8_t saved_c0;
+    sm2_z256_t saved_u;
+    sm2_z256_t one;
+    SM2_Z256_POINT saved_V;
+    SM2_Z256_POINT G;
+    int ok = 0;
+
+    memset(&msk, 0, sizeof(msk));
+    memset(&pp, 0, sizeof(pp));
+    memset(&sender, 0, sizeof(sender));
+    memset(&wrong_sender, 0, sizeof(wrong_sender));
+    memset(&receiver, 0, sizeof(receiver));
+    memset(&wrong_receiver, 0, sizeof(wrong_receiver));
+    pchs_ciphertext_init(&ct);
+    fill_message(message, sizeof(message));
+
+    CHECK(pchs_setup(&msk, &pp) == PCHS_OK);
+    CHECK(pchs_pki_keygen(&sender) == PCHS_OK);
+    CHECK(pchs_pki_keygen(&wrong_sender) == PCHS_OK);
+    CHECK(pchs_clc_keygen(&msk, &pp, id, sizeof(id) - 1, &receiver) == PCHS_OK);
+    CHECK(pchs_signcrypt(&pp, &sender, &receiver,
+        message, sizeof(message), &ct) == PCHS_OK);
+
+    saved_c0 = ct.c[0];
+    ct.c[0] ^= 0x01;
+    CHECK(decrypt_rejects(&pp, &sender, &receiver, &ct, out, sizeof(out)));
+    ct.c[0] = saved_c0;
+
+    sm2_z256_set_one(one);
+    sm2_z256_copy(saved_u, ct.u);
+    sm2_z256_modn_add(ct.u, ct.u, one);
+    CHECK(decrypt_rejects(&pp, &sender, &receiver, &ct, out, sizeof(out)));
+    sm2_z256_copy(ct.u, saved_u);
+
+    memcpy(&saved_V, &ct.V, sizeof(saved_V));
+    sm2_z256_point_mul_generator(&G, one);
+    sm2_z256_point_add(&ct.V, &ct.V, &G);
+    CHECK(decrypt_rejects(&pp, &sender, &receiver, &ct, out, sizeof(out)));
+    memcpy(&ct.V, &saved_V, sizeof(ct.V));
+
+    CHECK(decrypt_rejects(&pp, &wrong_sender, &receiver, &ct, out, sizeof(out)));
+
+    memcpy(&wrong_receiver, &receiver, sizeof(receiver));
+    sm2_z256_modn_add(wrong_receiver.x_c, wrong_receiver.x_c, one);
+    if (sm2_z256_is_zero(wrong_receiver.x_c)) {
+        sm2_z256_modn_add(wrong_receiver.x_c, wrong_receiver.x_c, one);
+    }
+    CHECK(decrypt_rejects(&pp, &sender, &wrong_receiver, &ct, out, sizeof(out)));
+
+    memcpy(&wrong_receiver, &receiver, sizeof(receiver));
+    sm2_z256_modn_add(wrong_receiver.d, wrong_receiver.d, one);
+    if (sm2_z256_is_zero(wrong_receiver.d)) {
+        sm2_z256_modn_add(wrong_receiver.d, wrong_receiver.d, one);
+    }
+    CHECK(decrypt_rejects(&pp, &sender, &wrong_receiver, &ct, out, sizeof(out)));
+
+    ok = 1;
+
+cleanup:
+    pchs_ciphertext_cleanup(&ct);
+    pchs_clc_key_cleanup(&receiver);
+    pchs_pki_key_cleanup(&wrong_sender);
+    pchs_pki_key_cleanup(&sender);
+    pchs_master_key_cleanup(&msk);
+    return ok;
+}
+
 int main(void)
 {
     const size_t sizes[] = {0, 1, 20, 128, 1024, 4096};
@@ -157,6 +250,9 @@ int main(void)
         if (!roundtrip(sizes[i])) {
             return 1;
         }
+    }
+    if (!tamper_rejection()) {
+        return 1;
     }
     puts("test_pchs_liu2018: ok");
     return 0;
