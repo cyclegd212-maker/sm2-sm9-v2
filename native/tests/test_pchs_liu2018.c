@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <gmssl/sm3.h>
 #include <pchs_liu2018.h>
 
 #define CHECK(x) do { \
@@ -12,12 +13,98 @@
     } \
 } while (0)
 
+static const uint8_t H2_DOMAIN[] = "LIU2018-PCHS-H2";
+
 static void fill_message(uint8_t *buf, size_t len)
 {
     size_t i;
     for (i = 0; i < len; i++) {
         buf[i] = (uint8_t)(i * 17u + len);
     }
+}
+
+static int test_hash_h2(
+    const uint8_t *message,
+    size_t message_len,
+    const SM2_Z256_POINT *r1,
+    sm2_z256_t out)
+{
+    uint8_t point_octets[65];
+    uint8_t digest[SM3_DIGEST_SIZE];
+    uint8_t ctr[4];
+    uint32_t counter;
+
+    if (sm2_z256_point_to_uncompressed_octets(r1, point_octets) != 1) {
+        return 0;
+    }
+    for (counter = 0; counter != UINT32_MAX; counter++) {
+        SM3_CTX ctx;
+        ctr[0] = (uint8_t)(counter >> 24);
+        ctr[1] = (uint8_t)(counter >> 16);
+        ctr[2] = (uint8_t)(counter >> 8);
+        ctr[3] = (uint8_t)counter;
+        sm3_init(&ctx);
+        sm3_update(&ctx, H2_DOMAIN, sizeof(H2_DOMAIN) - 1);
+        if (message_len) {
+            sm3_update(&ctx, message, message_len);
+        }
+        sm3_update(&ctx, point_octets, sizeof(point_octets));
+        sm3_update(&ctx, ctr, sizeof(ctr));
+        sm3_finish(&ctx, digest);
+        sm2_z256_from_bytes(out, digest);
+        if (!sm2_z256_is_zero(out)
+            && sm2_z256_cmp(out, sm2_z256_order()) < 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int check_algebra(
+    const PCHS_PUBLIC_PARAMS *pp,
+    const PCHS_PKI_KEY *sender,
+    const PCHS_CLC_KEY *receiver,
+    const PCHS_CIPHERTEXT *ct,
+    const uint8_t *message,
+    size_t message_len)
+{
+    SM2_Z256_POINT dP;
+    SM2_Z256_POINT gammaPpub;
+    SM2_Z256_POINT partial_rhs;
+    SM2_Z256_POINT v_minus_dP;
+    SM2_Z256_POINT r1;
+    SM2_Z256_POINT hP;
+    SM2_Z256_POINT uPKp;
+    SM2_Z256_POINT verification_rhs;
+    SM2_Z256_POINT r2_recovered;
+    sm2_z256_t x_c_inv;
+    sm2_z256_t h;
+
+    sm2_z256_point_mul_generator(&dP, receiver->d);
+    sm2_z256_point_mul(&gammaPpub, receiver->gamma, &pp->P_pub);
+    sm2_z256_point_add(&partial_rhs, &receiver->T, &gammaPpub);
+    if (sm2_z256_point_equ(&dP, &partial_rhs) != 1) {
+        return 0;
+    }
+
+    sm2_z256_point_sub(&v_minus_dP, &ct->V, &dP);
+    sm2_z256_modn_inv(x_c_inv, receiver->x_c);
+    sm2_z256_point_mul(&r1, x_c_inv, &v_minus_dP);
+    if (!test_hash_h2(message, message_len, &r1, h)) {
+        return 0;
+    }
+    sm2_z256_point_mul_generator(&hP, h);
+    sm2_z256_point_mul(&uPKp, ct->u, &sender->PK_p);
+    sm2_z256_point_sub(&verification_rhs, &hP, &uPKp);
+    if (sm2_z256_point_equ(&r1, &verification_rhs) != 1) {
+        return 0;
+    }
+
+    sm2_z256_point_add(&r2_recovered, &r1, &uPKp);
+    if (sm2_z256_point_equ(&r2_recovered, &hP) != 1) {
+        return 0;
+    }
+    return 1;
 }
 
 static int roundtrip(size_t n)
@@ -45,6 +132,7 @@ static int roundtrip(size_t n)
     CHECK(pchs_pki_keygen(&sender) == PCHS_OK);
     CHECK(pchs_clc_keygen(&msk, &pp, id, sizeof(id) - 1, &receiver) == PCHS_OK);
     CHECK(pchs_signcrypt(&pp, &sender, &receiver, m, n, &ct) == PCHS_OK);
+    CHECK(check_algebra(&pp, &sender, &receiver, &ct, m, n));
     CHECK(pchs_unsigncrypt(&pp, &sender, &receiver, &ct, out, &outlen) == PCHS_OK);
     CHECK(outlen == n);
     CHECK(n == 0 || memcmp(m, out, n) == 0);
