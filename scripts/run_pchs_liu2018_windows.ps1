@@ -23,7 +23,7 @@ function Invoke-NativeLogged {
     param(
         [Parameter(Mandatory = $true)] [string]$Log,
         [Parameter(Mandatory = $true)] [string]$Command,
-        [Parameter(ValueFromRemainingArguments = $true)] [string[]]$Arguments
+        [Parameter(Mandatory = $true)] [string[]]$Arguments
     )
     & $Command @Arguments 2>&1 | Tee-Object -FilePath $Log -Append
     if ($LASTEXITCODE -ne 0) {
@@ -79,21 +79,20 @@ if (Test-Path $Raw) {
     throw "refusing to overwrite existing raw CSV: $Raw"
 }
 
-Invoke-NativeLogged -Log $BuildLog -Command "cmake" -- \
-    -S native \
-    -B $BuildDir \
-    -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
+$ConfigureArgs = @(
+    "-S", "native",
+    "-B", $BuildDir,
+    "-G", "Ninja",
+    "-DCMAKE_BUILD_TYPE=Release",
     "-DGMSSL_ROOT=$ResolvedGmsslRoot"
+)
+Invoke-NativeLogged -Log $BuildLog -Command "cmake" -Arguments $ConfigureArgs
 
-Invoke-NativeLogged -Log $BuildLog -Command "cmake" -- \
-    --build $BuildDir \
-    --config Release
+$BuildArgs = @("--build", $BuildDir, "--config", "Release")
+Invoke-NativeLogged -Log $BuildLog -Command "cmake" -Arguments $BuildArgs
 
-Invoke-NativeLogged -Log $TestLog -Command "ctest" -- \
-    --test-dir $BuildDir \
-    -C Release \
-    --output-on-failure
+$TestArgs = @("--test-dir", $BuildDir, "-C", "Release", "--output-on-failure")
+Invoke-NativeLogged -Log $TestLog -Command "ctest" -Arguments $TestArgs
 
 $BenchExe = Get-ChildItem -Path $BuildDir -Recurse -File -Filter "bench_pchs_liu2018.exe" |
     Select-Object -First 1
@@ -102,22 +101,26 @@ if (-not $BenchExe) {
 }
 
 foreach ($Size in 20, 128, 1024, 4096) {
-    Invoke-NativeLogged -Log $BenchmarkLog -Command $BenchExe.FullName -- \
-        --run-id $RunId \
-        --commit $GitHead \
-        --gmssl-commit $GmsslCommit \
-        --message-bytes $Size \
-        --warmup $Warmup \
-        --iterations $Iterations \
-        --raw $Raw
+    $BenchArgs = @(
+        "--run-id", $RunId,
+        "--commit", $GitHead,
+        "--gmssl-commit", $GmsslCommit,
+        "--message-bytes", [string]$Size,
+        "--warmup", [string]$Warmup,
+        "--iterations", [string]$Iterations,
+        "--raw", $Raw
+    )
+    Invoke-NativeLogged -Log $BenchmarkLog -Command $BenchExe.FullName -Arguments $BenchArgs
 }
 
-Invoke-NativeLogged -Log $BenchmarkLog -Command "python" -- \
-    scripts/summarize_pchs_liu2018.py \
-    --raw $Raw \
-    --out $Summary \
-    --expected-sizes "20,128,1024,4096" \
-    --expected-n $Iterations
+$SummaryArgs = @(
+    "scripts/summarize_pchs_liu2018.py",
+    "--raw", $Raw,
+    "--out", $Summary,
+    "--expected-sizes", "20,128,1024,4096",
+    "--expected-n", [string]$Iterations
+)
+Invoke-NativeLogged -Log $BenchmarkLog -Command "python" -Arguments $SummaryArgs
 
 $Cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $Os = Get-CimInstance Win32_OperatingSystem
@@ -141,7 +144,7 @@ $EnvRecord = [ordered]@{
     ninja = Command-Text "ninja" @("--version")
     compiler_cc = Command-Text "cc" @("--version")
     python = Command-Text "python" @("--version")
-    git_status_porcelain = $GitStatus
+    git_status_porcelain_before_run = $GitStatus
     benchmark_executable = $BenchExe.FullName
     raw_csv = $Raw
     summary_csv = $Summary
@@ -151,13 +154,15 @@ $EnvRecord | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 $Environment
 
 if ($V2Raw) {
     $ResolvedV2Raw = (Resolve-Path $V2Raw).Path
-    Invoke-NativeLogged -Log $BenchmarkLog -Command "python" -- \
-        scripts/compare_v2_pchs.py \
-        --v2-raw $ResolvedV2Raw \
-        --pchs-raw $Raw \
-        --out $Comparison \
-        --expected-sizes "20,128,1024,4096" \
-        --expected-n $Iterations
+    $CompareArgs = @(
+        "scripts/compare_v2_pchs.py",
+        "--v2-raw", $ResolvedV2Raw,
+        "--pchs-raw", $Raw,
+        "--out", $Comparison,
+        "--expected-sizes", "20,128,1024,4096",
+        "--expected-n", [string]$Iterations
+    )
+    Invoke-NativeLogged -Log $BenchmarkLog -Command "python" -Arguments $CompareArgs
 }
 
 Write-Host "PCHS formal benchmark complete"
