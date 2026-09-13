@@ -63,7 +63,7 @@ KGC 选择 `r_R ∈ Z_q*`：
 5. 计算标量 `z = a*h_R*x_S^{-1} mod q`；
 6. `T2 = [z]B_R`；
 7. `c = m XOR H2(T2)`；
-8. 按 Gong 2025 PKI→CLC 对应 h4 域分支构造签密哈希 `h`，其输入必须绑定论文中该分支列出的发送者/接收者身份、公钥分量、`P_pub`、`c` 和 `T1`；
+8. `h = H4_PKICLC(ID_S, ID_R, P_S, P_R, R_R, X_R, P_pub, c, T1)`，严格对应 Gong 2025 Equation (5) 中 `F(PK_S)=1, F(PK_R)=3` 的分支；
 9. `S = a + h*x_S mod q`；
 10. 输出 `sigma = (c, S, T1)`。
 
@@ -73,7 +73,7 @@ KGC 选择 `r_R ∈ Z_q*`：
 
 接收者：
 
-1. 依据与 Signcryption 完全相同的域分离规则重算 `h`；
+1. 重算 `h = H4_PKICLC(ID_S, ID_R, P_S, P_R, R_R, X_R, P_pub, c, T1)`；
 2. `T1_prime = [S]P_S - [h]P`；
 3. 检查 `T1_prime == T1`，失败则返回拒绝；
 4. `T2_prime = [x_R + d_R]T1_prime`；
@@ -99,7 +99,7 @@ KGC 选择 `r_R ∈ Z_q*`：
 
 - `H1`: SM3 + 固定 domain separation，输入为规范编码后的 `ID_R || R_R || P_R`，输出归约为非零 SM2 标量。
 - `H2`: SM3-KDF，对规范编码的 `T2` 派生与消息等长的掩码。
-- `H4_PKICLC`: SM3 + 独立 domain separation，严格绑定 Gong 2025 PKI→CLC 分支在 Equation (5) 中规定的上下文，输出归约为非零 SM2 标量。
+- `H4_PKICLC`: SM3 + 独立 domain separation，输入按固定顺序编码为 `ID_S || ID_R || P_S || P_R || R_R || X_R || P_pub || c || T1`，输出归约为非零 SM2 标量。
 - 不把 C 结构体原始内存直接输入哈希；所有点均使用统一规范编码。
 
 ### 3.3 与既有基准的隔离
