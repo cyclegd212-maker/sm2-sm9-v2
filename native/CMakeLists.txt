@@ -143,6 +143,15 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bench_gong2025_pki_clc PRIVATE -Wall -Wextra -Werror)
 endif()
 
+add_executable(bench_hscmet2022 bench/bench_hscmet2022.c)
+target_include_directories(bench_hscmet2022 PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(bench_hscmet2022 PRIVATE hscmet2022)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bench_hscmet2022 PRIVATE -Wall -Wextra -Werror)
+endif()
+
 add_test(
     NAME benchmark_smoke
     COMMAND bench_v2
@@ -175,3 +184,14 @@ add_test(
         --warmup 0
         --iterations 1
         --raw "${CMAKE_CURRENT_BINARY_DIR}/benchmark-gong2025-smoke.csv")
+
+add_test(
+    NAME benchmark_hscmet2022_smoke
+    COMMAND bench_hscmet2022
+        --run-id smoke-hscmet2022
+        --commit smoke-hscmet2022
+        --gmssl-commit smoke-gmssl
+        --message-bytes 20
+        --warmup 0
+        --iterations 1
+        --raw "${CMAKE_CURRENT_BINARY_DIR}/benchmark-hscmet2022-smoke.csv")
