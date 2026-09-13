@@ -114,6 +114,15 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bench_pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
 endif()
 
+add_executable(bench_gong2025_pki_clc bench/bench_gong2025_pki_clc.c)
+target_include_directories(bench_gong2025_pki_clc PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(bench_gong2025_pki_clc PRIVATE gong2025_pki_clc)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bench_gong2025_pki_clc PRIVATE -Wall -Wextra -Werror)
+endif()
+
 add_test(
     NAME benchmark_smoke
     COMMAND bench_v2
@@ -135,3 +144,14 @@ add_test(
         --warmup 0
         --iterations 1
         --raw "${CMAKE_CURRENT_BINARY_DIR}/benchmark-pchs-smoke.csv")
+
+add_test(
+    NAME benchmark_gong2025_smoke
+    COMMAND bench_gong2025_pki_clc
+        --run-id smoke-gong2025
+        --commit smoke-gong2025
+        --gmssl-commit smoke-gmssl
+        --message-bytes 20
+        --warmup 0
+        --iterations 1
+        --raw "${CMAKE_CURRENT_BINARY_DIR}/benchmark-gong2025-smoke.csv")
