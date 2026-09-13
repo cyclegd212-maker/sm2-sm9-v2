@@ -2,7 +2,7 @@ name: pchs-ci
 
 on:
   push:
-    branches: [benchmark-liu2018-pchs, benchmark-gong2025-pki-clc]
+    branches: [benchmark-liu2018-pchs, benchmark-gong2025-pki-clc, benchmark-hscmet2022-pki-clc]
   workflow_dispatch:
 
 permissions:
@@ -60,6 +60,10 @@ jobs:
             python scripts/summarize_gong2025.py --self-test
             python scripts/compare_v2_gong2025.py --self-test
           fi
+          if [ -f scripts/summarize_hscmet2022.py ]; then
+            python scripts/summarize_hscmet2022.py --self-test
+            python scripts/compare_v2_hscmet2022.py --self-test
+          fi
 
       - name: Parse Windows benchmark scripts
         shell: pwsh
@@ -67,6 +71,9 @@ jobs:
           $files = @("scripts/run_pchs_liu2018_windows.ps1")
           if (Test-Path "scripts/run_gong2025_windows.ps1") {
             $files += "scripts/run_gong2025_windows.ps1"
+          }
+          if (Test-Path "scripts/run_hscmet2022_windows.ps1") {
+            $files += "scripts/run_hscmet2022_windows.ps1"
           }
           foreach ($file in $files) {
             $tokens = $null
