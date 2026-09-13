@@ -6,6 +6,7 @@ _deps/
 native/build/
 native/build-pchs-liu2018/
 native/build-gong2025-pki-clc/
+native/build-hscmet2022-pki-clc/
 artifacts/
 # Preserve experiment evidence directories but not accidental temp files
 logs/*.tmp
