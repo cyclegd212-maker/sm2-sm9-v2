@@ -58,6 +58,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(gong2025_pki_clc PRIVATE -Wall -Wextra -Werror)
 endif()
 
+add_library(hscmet2022 STATIC
+    src/hscmet2022.c)
+target_include_directories(hscmet2022 PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(hscmet2022 PUBLIC "${GMSSL_LIBRARY}")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(hscmet2022 PRIVATE -Wall -Wextra -Werror)
+endif()
+
 function(v2_test_target name source)
     add_executable(${name} ${source})
     target_include_directories(${name} PRIVATE
@@ -95,6 +105,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_gong2025_pki_clc PRIVATE -Wall -Wextra -Werror)
 endif()
 add_test(NAME gong2025_api_roundtrip COMMAND test_gong2025_pki_clc)
+
+add_executable(test_hscmet2022 tests/test_hscmet2022.c)
+target_include_directories(test_hscmet2022 PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(test_hscmet2022 PRIVATE hscmet2022)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_hscmet2022 PRIVATE -Wall -Wextra -Werror)
+endif()
+add_test(NAME hscmet2022_api_roundtrip COMMAND test_hscmet2022)
 
 add_executable(bench_v2 bench/bench_v2.c)
 target_include_directories(bench_v2 PRIVATE
