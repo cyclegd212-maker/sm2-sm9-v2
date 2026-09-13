@@ -48,6 +48,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
 endif()
 
+add_library(gong2025_pki_clc STATIC
+    src/gong2025_pki_clc.c)
+target_include_directories(gong2025_pki_clc PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(gong2025_pki_clc PUBLIC "${GMSSL_LIBRARY}")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(gong2025_pki_clc PRIVATE -Wall -Wextra -Werror)
+endif()
+
 function(v2_test_target name source)
     add_executable(${name} ${source})
     target_include_directories(${name} PRIVATE
@@ -75,6 +85,16 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_pchs_liu2018 PRIVATE -Wall -Wextra -Werror)
 endif()
 add_test(NAME pchs_api_roundtrip COMMAND test_pchs_liu2018)
+
+add_executable(test_gong2025_pki_clc tests/test_gong2025_pki_clc.c)
+target_include_directories(test_gong2025_pki_clc PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${GMSSL_INCLUDE_DIR}")
+target_link_libraries(test_gong2025_pki_clc PRIVATE gong2025_pki_clc)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_gong2025_pki_clc PRIVATE -Wall -Wextra -Werror)
+endif()
+add_test(NAME gong2025_api_roundtrip COMMAND test_gong2025_pki_clc)
 
 add_executable(bench_v2 bench/bench_v2.c)
 target_include_directories(bench_v2 PRIVATE
