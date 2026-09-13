@@ -58,3 +58,15 @@ The repository is intentionally conservative about evidence:
 ## Research status
 
 This is a pre-submission research artifact, not a claim of a finalized standard-conformant implementation. The current prototype is used to align code with the V2 equations and prepare a reproducible benchmark workflow. The main theoretical item still requiring reviewer-level scrutiny is the non-standard Type-I-KSR (known-secret public-key replacement) model; formal performance claims remain pending real measurements.
+
+## Same-platform reproduced baselines used in the current manuscript
+
+The native-C comparison implementations are preserved on dedicated benchmark branches. Their current manuscript reference numbers are:
+
+- **[30] Liu 2018** — `benchmark-liu2018-pchs`
+- **[34] HSC-MET 2022** — `benchmark-hscmet2022-pki-clc`
+- **[37] Gong 2025** — `benchmark-gong2025-pki-clc`
+
+Detailed bibliography/commit mapping: [`docs/REPRODUCED_BASELINES.md`](docs/REPRODUCED_BASELINES.md).
+
+These are independent reimplementations from the published scheme descriptions, not the original authors' source-code releases.
