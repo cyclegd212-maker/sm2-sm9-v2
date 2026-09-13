@@ -2,7 +2,7 @@ name: pchs-ci
 
 on:
   push:
-    branches: [benchmark-liu2018-pchs]
+    branches: [benchmark-liu2018-pchs, benchmark-gong2025-pki-clc]
   workflow_dispatch:
 
 permissions:
